@@ -1,0 +1,97 @@
+import mongoose from 'mongoose';
+
+const watchlistItemSchema = new mongoose.Schema({
+  movieId: {
+    type: Number,
+    required: true
+  },
+  mediaType: {
+    type: String,
+    enum: ['movie', 'tv'],
+    default: 'movie'
+  },
+  title: String,
+  posterPath: String,
+  addedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const continueWatchingSchema = new mongoose.Schema({
+  movieId: {
+    type: Number,
+    required: true
+  },
+  mediaType: {
+    type: String,
+    enum: ['movie', 'tv'],
+    default: 'movie'
+  },
+  title: String,
+  posterPath: String,
+  backdropPath: String,
+  progress: {
+    type: Number, // Percentage watched (0-100)
+    default: 0,
+    min: 0,
+    max: 100
+  },
+  currentTime: {
+    type: Number, // Seconds into the video
+    default: 0
+  },
+  duration: {
+    type: Number, // Total duration in seconds
+    default: 0
+  },
+  lastWatched: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const librarySchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true
+  },
+  watchlist: [watchlistItemSchema],
+  continueWatching: [continueWatchingSchema],
+  watchedHistory: [{
+    movieId: Number,
+    mediaType: {
+      type: String,
+      enum: ['movie', 'tv'],
+      default: 'movie'
+    },
+    watchedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
+}, {
+  timestamps: true
+});
+
+// Index for faster lookups
+librarySchema.index({ userId: 1 });
+librarySchema.index({ 'watchlist.movieId': 1 });
+librarySchema.index({ 'continueWatching.movieId': 1 });
+
+// Method to check if movie is in watchlist
+librarySchema.methods.isInWatchlist = function(movieId) {
+  return this.watchlist.some(item => item.movieId === movieId);
+};
+
+// Method to get continue watching progress
+librarySchema.methods.getProgress = function(movieId) {
+  const item = this.continueWatching.find(item => item.movieId === movieId);
+  return item ? item.progress : 0;
+};
+
+const Library = mongoose.model('Library', librarySchema);
+
+export default Library;

@@ -1,0 +1,251 @@
+import axios from 'axios';
+
+// Create axios instance for TMDB API
+const tmdbApi = axios.create({
+  baseURL: process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3'
+});
+
+// Request interceptor to add API key dynamically (after dotenv has loaded)
+tmdbApi.interceptors.request.use((config) => {
+  config.params = {
+    ...config.params,
+    api_key: process.env.TMDB_API_KEY
+  };
+  return config;
+});
+
+// Image base URLs
+export const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+export const POSTER_SIZES = {
+  small: 'w185',
+  medium: 'w342',
+  large: 'w500',
+  original: 'original'
+};
+export const BACKDROP_SIZES = {
+  small: 'w300',
+  medium: 'w780',
+  large: 'w1280',
+  original: 'original'
+};
+
+// Transform movie data for consistent frontend format
+const transformMovie = (movie, userLibrary = null) => {
+  const transformed = {
+    id: movie.id,
+    title: movie.title || movie.name,
+    originalTitle: movie.original_title || movie.original_name,
+    overview: movie.overview,
+    posterPath: movie.poster_path 
+      ? `${IMAGE_BASE_URL}/${POSTER_SIZES.large}${movie.poster_path}`
+      : null,
+    backdropPath: movie.backdrop_path 
+      ? `${IMAGE_BASE_URL}/${BACKDROP_SIZES.large}${movie.backdrop_path}`
+      : null,
+    releaseDate: movie.release_date || movie.first_air_date,
+    voteAverage: movie.vote_average,
+    voteCount: movie.vote_count,
+    popularity: movie.popularity,
+    genreIds: movie.genre_ids || [],
+    mediaType: movie.media_type || 'movie',
+    adult: movie.adult || false
+  };
+
+  // Stitch user library data if available
+  if (userLibrary) {
+    transformed.isInWatchlist = userLibrary.isInWatchlist(movie.id);
+    transformed.watchProgress = userLibrary.getProgress(movie.id);
+  }
+
+  return transformed;
+};
+
+// Transform detailed movie data
+const transformMovieDetails = (movie, credits = null, userLibrary = null) => {
+  const transformed = {
+    id: movie.id,
+    title: movie.title || movie.name,
+    tagline: movie.tagline,
+    overview: movie.overview,
+    posterPath: movie.poster_path 
+      ? `${IMAGE_BASE_URL}/${POSTER_SIZES.large}${movie.poster_path}`
+      : null,
+    backdropPath: movie.backdrop_path 
+      ? `${IMAGE_BASE_URL}/${BACKDROP_SIZES.original}${movie.backdrop_path}`
+      : null,
+    releaseDate: movie.release_date || movie.first_air_date,
+    runtime: movie.runtime || (movie.episode_run_time && movie.episode_run_time[0]),
+    voteAverage: movie.vote_average,
+    voteCount: movie.vote_count,
+    genres: movie.genres || [],
+    status: movie.status,
+    budget: movie.budget,
+    revenue: movie.revenue,
+    productionCompanies: movie.production_companies?.map(c => c.name) || [],
+    mediaType: movie.name ? 'tv' : 'movie'
+  };
+
+  // Add credits if available
+  if (credits) {
+    transformed.cast = credits.cast?.slice(0, 10).map(person => ({
+      id: person.id,
+      name: person.name,
+      character: person.character,
+      profilePath: person.profile_path 
+        ? `${IMAGE_BASE_URL}/w185${person.profile_path}`
+        : null
+    })) || [];
+    
+    transformed.director = credits.crew?.find(
+      person => person.job === 'Director'
+    )?.name || null;
+  }
+
+  // Stitch user library data
+  if (userLibrary) {
+    transformed.isInWatchlist = userLibrary.isInWatchlist(movie.id);
+    transformed.watchProgress = userLibrary.getProgress(movie.id);
+  }
+
+  return transformed;
+};
+
+// API Methods
+export const tmdbService = {
+  // Get trending movies/shows
+  async getTrending(mediaType = 'movie', timeWindow = 'week', page = 1) {
+    const response = await tmdbApi.get(`/trending/${mediaType}/${timeWindow}`, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get popular movies/shows
+  async getPopular(mediaType = 'movie', page = 1) {
+    const response = await tmdbApi.get(`/${mediaType}/popular`, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get top rated
+  async getTopRated(mediaType = 'movie', page = 1) {
+    const response = await tmdbApi.get(`/${mediaType}/top_rated`, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get now playing (movies) or on the air (TV)
+  async getNowPlaying(mediaType = 'movie', page = 1) {
+    const endpoint = mediaType === 'movie' ? '/movie/now_playing' : '/tv/on_the_air';
+    const response = await tmdbApi.get(endpoint, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get movies by genre
+  async getByGenre(genreId, mediaType = 'movie', page = 1) {
+    const response = await tmdbApi.get(`/discover/${mediaType}`, {
+      params: { 
+        with_genres: genreId,
+        page,
+        sort_by: 'popularity.desc'
+      }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get movie/show details
+  async getDetails(id, mediaType = 'movie', userLibrary = null) {
+    const [detailsResponse, creditsResponse] = await Promise.all([
+      tmdbApi.get(`/${mediaType}/${id}`),
+      tmdbApi.get(`/${mediaType}/${id}/credits`)
+    ]);
+    
+    return transformMovieDetails(
+      detailsResponse.data, 
+      creditsResponse.data,
+      userLibrary
+    );
+  },
+
+  // Search movies and shows
+  async search(query, page = 1, mediaType = 'multi') {
+    const response = await tmdbApi.get(`/search/${mediaType}`, {
+      params: { query, page }
+    });
+    
+    // Filter out people from multi-search
+    const filtered = mediaType === 'multi' 
+      ? response.data.results.filter(item => item.media_type !== 'person')
+      : response.data.results;
+
+    return {
+      results: filtered.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get genre list
+  async getGenres(mediaType = 'movie') {
+    const response = await tmdbApi.get(`/genre/${mediaType}/list`);
+    return response.data.genres;
+  },
+
+  // Get similar movies
+  async getSimilar(id, mediaType = 'movie', page = 1) {
+    const response = await tmdbApi.get(`/${mediaType}/${id}/similar`, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  },
+
+  // Get recommendations
+  async getRecommendations(id, mediaType = 'movie', page = 1) {
+    const response = await tmdbApi.get(`/${mediaType}/${id}/recommendations`, {
+      params: { page }
+    });
+    return {
+      results: response.data.results.map(movie => transformMovie(movie)),
+      page: response.data.page,
+      totalPages: response.data.total_pages,
+      totalResults: response.data.total_results
+    };
+  }
+};
+
+export default tmdbService;
