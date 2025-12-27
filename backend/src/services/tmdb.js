@@ -245,6 +245,40 @@ export const tmdbService = {
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
     };
+  },
+
+  // Get videos (trailers, clips, etc.)
+  async getVideos(id, mediaType = 'movie') {
+    const response = await tmdbApi.get(`/${mediaType}/${id}/videos`);
+    
+    // Filter and prioritize videos
+    const videos = response.data.results || [];
+    
+    // Sort: Official trailers first, then teasers, then others
+    const sorted = videos
+      .filter(v => v.site === 'YouTube') // Only YouTube videos
+      .sort((a, b) => {
+        // Prioritize official trailers
+        const aScore = (a.official ? 10 : 0) + 
+                       (a.type === 'Trailer' ? 5 : 0) + 
+                       (a.type === 'Teaser' ? 3 : 0);
+        const bScore = (b.official ? 10 : 0) + 
+                       (b.type === 'Trailer' ? 5 : 0) + 
+                       (b.type === 'Teaser' ? 3 : 0);
+        return bScore - aScore;
+      });
+
+    return {
+      results: sorted.map(video => ({
+        id: video.id,
+        key: video.key,
+        name: video.name,
+        type: video.type,
+        official: video.official,
+        site: video.site,
+        size: video.size // Quality: 360, 480, 720, 1080
+      }))
+    };
   }
 };
 

@@ -225,4 +225,20 @@ router.get('/:id/recommendations', optionalAuth, async (req, res) => {
   }
 });
 
+// @route   GET /api/movies/:id/videos
+// @desc    Get movie/show videos (trailers, clips)
+// @access  Public
+router.get('/:id/videos', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mediaType = 'movie' } = req.query;
+    
+    const data = await tmdbService.getVideos(parseInt(id), mediaType);
+    res.json(data);
+  } catch (error) {
+    console.error('Videos error:', error);
+    res.status(500).json({ error: 'Failed to fetch videos' });
+  }
+});
+
 export default router;
