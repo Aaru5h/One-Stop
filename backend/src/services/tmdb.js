@@ -30,7 +30,8 @@ export const BACKDROP_SIZES = {
 };
 
 // Transform movie data for consistent frontend format
-const transformMovie = (movie, userLibrary = null) => {
+// explicitMediaType is used when fetching from endpoints that don't include media_type in response
+const transformMovie = (movie, userLibrary = null, explicitMediaType = null) => {
   const transformed = {
     id: movie.id,
     title: movie.title || movie.name,
@@ -47,7 +48,8 @@ const transformMovie = (movie, userLibrary = null) => {
     voteCount: movie.vote_count,
     popularity: movie.popularity,
     genreIds: movie.genre_ids || [],
-    mediaType: movie.media_type || 'movie',
+    // Use explicit mediaType if provided, then TMDB's media_type, then default to 'movie'
+    mediaType: explicitMediaType || movie.media_type || 'movie',
     adult: movie.adult || false
   };
 
@@ -117,8 +119,10 @@ export const tmdbService = {
     const response = await tmdbApi.get(`/trending/${mediaType}/${timeWindow}`, {
       params: { page }
     });
+    // Pass mediaType explicitly for non-'all' endpoints since TMDB doesn't include it
+    const explicitType = mediaType === 'all' ? null : mediaType;
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, explicitType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -131,7 +135,7 @@ export const tmdbService = {
       params: { page }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -144,7 +148,7 @@ export const tmdbService = {
       params: { page }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -158,7 +162,7 @@ export const tmdbService = {
       params: { page }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -175,7 +179,7 @@ export const tmdbService = {
       }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -227,7 +231,7 @@ export const tmdbService = {
       params: { page }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
@@ -240,7 +244,7 @@ export const tmdbService = {
       params: { page }
     });
     return {
-      results: response.data.results.map(movie => transformMovie(movie)),
+      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
       page: response.data.page,
       totalPages: response.data.total_pages,
       totalResults: response.data.total_results
