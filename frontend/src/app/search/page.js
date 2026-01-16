@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import MovieCard, { MovieCardSkeleton } from '@/components/MovieCard';
@@ -37,6 +38,7 @@ const CloseIcon = () => (
 );
 
 export default function SearchPage() {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -114,6 +116,11 @@ export default function SearchPage() {
     setIsModalOpen(false);
     setTimeout(() => setSelectedMovie(null), 300);
   };
+
+  const handlePlay = useCallback((movie) => {
+    const mediaType = movie.mediaType || 'movie';
+    router.push(`/watch?id=${movie.id}&type=${mediaType}`);
+  }, [router]);
 
   const clearSearch = () => {
     setQuery('');
@@ -246,6 +253,7 @@ export default function SearchPage() {
         movie={movieDetails || selectedMovie}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+        onPlay={handlePlay}
         isInWatchlist={isSelectedMovieInWatchlist}
         onToggleWatchlist={handleToggleWatchlist}
         layoutId={selectedMovie ? `search-movie-${selectedMovie.id}` : undefined}
