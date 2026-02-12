@@ -229,6 +229,7 @@ export default function SearchPage() {
                   <MovieCard
                     movie={movie}
                     onClick={handleMovieClick}
+                    onPlay={handlePlay}
                     onAddToWatchlist={handleToggleWatchlist}
                     isInWatchlist={watchlistIds.has(movie.id)}
                     size="lg"
