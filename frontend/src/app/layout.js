@@ -3,6 +3,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 import Navbar from "@/components/Navbar";
 import MobileTabBar from "@/components/MobileTabBar";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({ children }) {
             {children}
           </main>
           <MobileTabBar activeTab="home" />
+          <Analytics />
         </Providers>
       </body>
     </html>
