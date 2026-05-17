@@ -538,8 +538,9 @@ function WatchContent() {
 
       {/* ─── Floating Episodes Button (Always Accessible) ─── */}
       <AnimatePresence>
-        {mediaType === 'tv' && realSeasons.length > 0 && !isSidebarOpen && (
+        {mediaType === 'tv' && !isSidebarOpen && (
           <motion.button
+            key="floating-episodes-btn"
             className="watch-floating-episodes-btn"
             onClick={() => setIsSidebarOpen(true)}
             initial={{ opacity: 0, scale: 0.9 }}
