@@ -45,34 +45,11 @@ function usePlayerState() {
   const [showTitleCard, setShowTitleCard] = useState(false);
   const titleCardTimerRef = useRef(null);
 
-  // Track iframe focus to detect play/pause.
-  // When user clicks inside iframe (to play/pause), the main window loses focus.
-  // We use a toggle pattern: each click inside the iframe toggles the paused state.
+  // We removed the blur/focus detection because it is unreliable for tracking
+  // iframe clicks due to browser security boundaries (CORS). It was causing the 
+  // title card to appear while playing.
   useEffect(() => {
-    let lastBlurTime = 0;
-
-    const handleWindowBlur = () => {
-      // When window loses focus, the user clicked inside the iframe
-      const now = Date.now();
-      // Debounce: ignore rapid blur events (< 300ms apart)
-      if (now - lastBlurTime < 300) return;
-      lastBlurTime = now;
-
-      setIsPaused(prev => !prev);
-    };
-
-    const handleWindowFocus = () => {
-      // When user clicks back outside the iframe, don't toggle.
-      // This is just them interacting with our UI controls.
-    };
-
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-    
-    return () => {
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
-    };
+    // Spacebar is handled in the main component.
   }, []);
 
   // State 3: When paused, show title card after 2.5s of mouse inactivity
