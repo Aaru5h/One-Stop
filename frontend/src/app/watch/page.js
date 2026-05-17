@@ -61,24 +61,19 @@ function usePlayerState() {
   // Listen for Vidking postMessage events (Observer Pattern)
   useEffect(() => {
     const handleMessage = (event) => {
-      // Security: only process messages from Vidking
-      if (event.origin && !event.origin.includes('vidking.net')) return;
-
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         
-        switch (data.event) {
-          case 'play':
+        if (data && typeof data === 'object') {
+          const eventName = data.event || data.type || data.action;
+          
+          if (eventName === 'play' || eventName === 'playing') {
             setIsPaused(false);
-            break;
-          case 'pause':
+          } else if (eventName === 'pause' || eventName === 'paused') {
             setIsPaused(true);
-            break;
-          case 'ended':
+          } else if (eventName === 'ended') {
             setIsPaused(true);
-            break;
-          default:
-            break;
+          }
         }
       } catch {
         // Non-JSON message, ignore
@@ -87,19 +82,6 @@ function usePlayerState() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // Fallback: Spacebar toggles pause if postMessage isn't available
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === ' ' && e.target === document.body) {
-        e.preventDefault();
-        setIsPaused((prev) => !prev);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // When paused → start 2.5s countdown → show title card
@@ -351,15 +333,7 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
         {/* Action buttons */}
         {mediaType === 'tv' && (
           <div className="title-card-actions">
-            <motion.button
-              className="title-card-episodes-btn"
-              onClick={onOpenEpisodes}
-              whileHover={{ scale: 1.03, backgroundColor: 'rgba(255,255,255,0.15)' }}
-              whileTap={{ scale: 0.97 }}
-            >
-              <EpisodesIcon />
-              <span>Episodes</span>
-            </motion.button>
+            {/* Moved Episodes button to floating position per user request */}
           </div>
         )}
       </div>
@@ -558,23 +532,25 @@ function WatchContent() {
               <BackIcon />
               <span>Back</span>
             </motion.button>
-
-            {/* Episodes Button in top bar (only for TV) */}
-            {mediaType === 'tv' && realSeasons.length > 0 && !isSidebarOpen && (
-              <motion.button
-                className="watch-episodes-btn"
-                onClick={() => setIsSidebarOpen(true)}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <EpisodesIcon />
-                <span>Episodes</span>
-              </motion.button>
-            )}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Floating Episodes Button (Always Accessible) ─── */}
+      <AnimatePresence>
+        {mediaType === 'tv' && realSeasons.length > 0 && !isSidebarOpen && (
+          <motion.button
+            className="watch-floating-episodes-btn"
+            onClick={() => setIsSidebarOpen(true)}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <EpisodesIcon />
+            <span>Episodes</span>
+          </motion.button>
         )}
       </AnimatePresence>
 

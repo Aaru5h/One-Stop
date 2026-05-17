@@ -122,8 +122,12 @@
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* ─── Episodes Button (Top Bar) ─── */
-.watch-episodes-btn {
+/* ─── Floating Episodes Button ─── */
+.watch-floating-episodes-btn {
+  position: absolute;
+  top: 1.5rem;
+  right: 6rem;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -140,11 +144,22 @@
   transition: all 0.25s var(--watch-transition);
   letter-spacing: 0.01em;
   font-family: inherit;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
-.watch-episodes-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.15);
+.watch-floating-episodes-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .watch-floating-episodes-btn {
+    top: 1rem;
+    right: 4rem;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
