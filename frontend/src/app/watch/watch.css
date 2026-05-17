@@ -1,11 +1,35 @@
 /* ═══════════════════════════════════════════════════════════
-   Watch Page — Netflix-Grade Cinema Experience
+   Watch Page — Cinema-Grade Streaming Experience
    ═══════════════════════════════════════════════════════════
+   Provider: Vidking Player (postMessage API for play/pause)
+   
    Three visual states:
-   1. Playing (clean)    — nothing visible, pure cinema
-   2. Mouse active       — only native player controls (handled by iframe)  
-   3. Paused + idle      — dimmed overlay, title card, episode selectors
+   1. Playing (clean)    → nothing visible, cursor hidden, pure cinema
+   2. Paused + idle      → dimmed overlay, title card, controls fade in
+   3. Sidebar open       → right-side episode panel slides in
+
+   Design Language: Glassmorphism, Netflix-grade typography,
+   spring animations via Framer Motion.
    ═══════════════════════════════════════════════════════════ */
+
+/* ─── Variables ─── */
+:root {
+  --watch-accent: #e50914;
+  --watch-accent-glow: rgba(229, 9, 20, 0.35);
+  --watch-glass-bg: rgba(14, 14, 14, 0.72);
+  --watch-glass-border: rgba(255, 255, 255, 0.07);
+  --watch-glass-blur: blur(20px) saturate(1.8);
+  --watch-text-primary: rgba(255, 255, 255, 0.95);
+  --watch-text-secondary: rgba(255, 255, 255, 0.6);
+  --watch-text-tertiary: rgba(255, 255, 255, 0.4);
+  --watch-green: #46d369;
+  --watch-sidebar-width: 420px;
+  --watch-transition: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Icon Sizes ─── */
+.icon-sm { width: 20px; height: 20px; }
+.icon-xs { width: 16px; height: 16px; }
 
 /* ─── Base Container ─── */
 .watch-container {
@@ -15,15 +39,13 @@
   z-index: 100;
   display: flex;
   flex-direction: column;
-  cursor: none; /* Hidden cursor during playback */
+  cursor: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
 }
 
-.watch-container.is-paused {
-  cursor: default;
-}
-
-.watch-container.show-title-card {
+.watch-container.is-paused,
+.watch-container.show-overlay {
   cursor: default;
 }
 
@@ -33,7 +55,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
   position: relative;
   z-index: 1;
 }
@@ -51,27 +72,28 @@
   display: block;
 }
 
-/* ─── Pause Overlay (State 3: Dimmed Backdrop) ─── */
+/* ─── Pause Overlay (Dimmed Backdrop) ─── */
 .pause-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 5;
   pointer-events: none;
-  backdrop-filter: brightness(0.7);
 }
 
-/* ─── Top Controls Bar (State 3 Only) ─── */
+/* ═══════════════════════════════════════════════════════════
+   Top Controls Bar
+   ═══════════════════════════════════════════════════════════ */
 .watch-top-controls {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: 25;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   pointer-events: auto;
 }
 
@@ -80,104 +102,53 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.65rem 1.25rem;
-  background: rgba(20, 20, 20, 0.7);
-  backdrop-filter: blur(16px) saturate(1.8);
-  -webkit-backdrop-filter: blur(16px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.6rem 1.2rem;
+  background: var(--watch-glass-bg);
+  backdrop-filter: var(--watch-glass-blur);
+  -webkit-backdrop-filter: var(--watch-glass-blur);
+  border: 1px solid var(--watch-glass-border);
   border-radius: 50px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.9rem;
+  color: var(--watch-text-primary);
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s var(--watch-transition);
   letter-spacing: 0.01em;
+  font-family: inherit;
 }
 
 .watch-back-btn:hover {
   background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: white;
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
-.watch-back-btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* ─── Episode Selector (State 3 Only) ─── */
-.episode-selector {
-  display: flex;
-  gap: 0.75rem;
-  pointer-events: auto;
-}
-
-.selector-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.selector-group label {
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.45);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-  padding-left: 0.25rem;
-}
-
-.select-wrapper {
-  position: relative;
+/* ─── Episodes Button (Top Bar) ─── */
+.watch-episodes-btn {
   display: flex;
   align-items: center;
-}
-
-.select-wrapper select {
-  appearance: none;
-  background: rgba(20, 20, 20, 0.7);
-  backdrop-filter: blur(16px) saturate(1.8);
-  -webkit-backdrop-filter: blur(16px) saturate(1.8);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.85rem;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: var(--watch-glass-bg);
+  backdrop-filter: var(--watch-glass-blur);
+  -webkit-backdrop-filter: var(--watch-glass-blur);
+  border: 1px solid var(--watch-glass-border);
+  border-radius: 50px;
+  color: var(--watch-text-primary);
+  font-size: 0.875rem;
   font-weight: 500;
-  padding: 0.55rem 2.25rem 0.55rem 0.85rem;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 130px;
+  transition: all 0.25s var(--watch-transition);
+  letter-spacing: 0.01em;
   font-family: inherit;
 }
 
-.select-wrapper select:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.select-wrapper select:focus {
-  outline: none;
-  border-color: rgba(229, 9, 20, 0.6);
-  box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.15);
-}
-
-.select-wrapper select option {
-  background: #141414;
-  color: #e5e5e5;
-  padding: 0.5rem;
-}
-
-.select-wrapper svg {
-  position: absolute;
-  right: 0.6rem;
-  pointer-events: none;
-  color: rgba(255, 255, 255, 0.4);
-  width: 16px;
-  height: 16px;
+.watch-episodes-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Netflix-Style Title Card (State 3 Only)
+   Netflix-Style Title Card (Bottom-Left Overlay)
    ═══════════════════════════════════════════════════════════ */
 .title-card {
   position: absolute;
@@ -187,27 +158,27 @@
   z-index: 20;
   padding: 3rem 3rem 2.5rem;
   pointer-events: none;
-  /* Gradient from bottom for text readability */
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.6) 40%,
-    rgba(0, 0, 0, 0.25) 70%,
+    rgba(0, 0, 0, 0.88) 0%,
+    rgba(0, 0, 0, 0.6) 35%,
+    rgba(0, 0, 0, 0.2) 65%,
     transparent 100%
   );
 }
 
 .title-card-content {
-  max-width: 55%;
+  max-width: 50%;
+  pointer-events: auto;
 }
 
 .title-card-name {
-  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-size: clamp(1.8rem, 3.5vw, 3rem);
   font-weight: 800;
   color: white;
-  margin: 0 0 0.5rem 0;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
   text-shadow: 0 2px 30px rgba(0, 0, 0, 0.7);
 }
 
@@ -215,76 +186,415 @@
 .title-card-episode {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.6rem;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
 }
 
 .title-card-episode-tag {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.65rem;
-  background: rgba(229, 9, 20, 0.85);
+  padding: 0.2rem 0.6rem;
+  background: var(--watch-accent);
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: white;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .title-card-episode-name {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* Tagline */
 .title-card-tagline {
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  color: var(--watch-text-tertiary);
   font-style: italic;
-  margin: 0 0 0.6rem 0;
+  margin: 0 0 0.5rem;
   font-weight: 400;
 }
 
-/* Metadata row */
 .title-card-meta {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.6rem;
+  margin-bottom: 0.65rem;
   flex-wrap: wrap;
 }
 
 .title-card-year {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  color: var(--watch-text-secondary);
   font-weight: 500;
 }
 
 .title-card-rating {
-  font-size: 0.85rem;
-  color: #46d369;
+  font-size: 0.82rem;
+  color: var(--watch-green);
   font-weight: 600;
 }
 
 .title-card-genres {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.82rem;
+  color: var(--watch-text-tertiary);
   font-weight: 400;
 }
 
-/* Overview */
 .title-card-overview {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0;
-  line-height: 1.55;
-  max-width: 600px;
+  font-size: 0.88rem;
+  color: var(--watch-text-secondary);
+  margin: 0 0 0.8rem;
+  line-height: 1.5;
+  max-width: 560px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Title Card Actions */
+.title-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.title-card-episodes-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: var(--watch-glass-blur);
+  -webkit-backdrop-filter: var(--watch-glass-blur);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--watch-text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.25s var(--watch-transition);
+}
+
+.title-card-episodes-btn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Episode Sidebar (Cineby-Inspired Slide-In Panel)
+   ═══════════════════════════════════════════════════════════ */
+.episode-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--watch-sidebar-width);
+  max-width: 90vw;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(30px) saturate(1.6);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--watch-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: var(--watch-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s var(--watch-transition);
+  font-family: inherit;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+/* Season Selector */
+.sidebar-season-selector {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.sidebar-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-season-select {
+  appearance: none;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--watch-text-primary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.6rem 2.2rem 0.6rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.25s var(--watch-transition);
+  font-family: inherit;
+}
+
+.sidebar-season-select:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.sidebar-season-select:focus {
+  outline: none;
+  border-color: var(--watch-accent);
+  box-shadow: 0 0 0 2px var(--watch-accent-glow);
+}
+
+.sidebar-season-select option {
+  background: #141414;
+  color: #e5e5e5;
+}
+
+.sidebar-select-wrapper svg {
+  position: absolute;
+  right: 0.7rem;
+  pointer-events: none;
+  color: var(--watch-text-tertiary);
+}
+
+/* Season Overview */
+.sidebar-season-overview {
+  padding: 0.6rem 1.5rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--watch-text-tertiary);
+  line-height: 1.5;
+  margin: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+/* Episode List */
+.sidebar-episode-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.sidebar-episode-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-episode-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-episode-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.sidebar-episode-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Episode Item */
+.sidebar-episode-item {
+  display: flex;
+  gap: 0.9rem;
+  padding: 0.9rem 1.5rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.2s var(--watch-transition);
+  font-family: inherit;
+  color: inherit;
+}
+
+.sidebar-episode-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-episode-item.is-active {
+  background: rgba(229, 9, 20, 0.06);
+  border-left: 3px solid var(--watch-accent);
+}
+
+/* Episode Thumbnail */
+.episode-thumb-wrapper {
+  position: relative;
+  width: 130px;
+  min-width: 130px;
+  height: 73px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.episode-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.episode-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.episode-watching-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 0.15rem 0.45rem;
+  background: var(--watch-accent);
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.4);
+}
+
+.episode-number-badge {
+  position: absolute;
+  bottom: 5px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: white;
+}
+
+/* Episode Info */
+.episode-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.episode-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--watch-text-primary);
+  margin: 0;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-episode-item.is-active .episode-title {
+  color: var(--watch-accent);
+}
+
+.episode-runtime {
+  font-size: 0.72rem;
+  color: var(--watch-text-tertiary);
+  font-weight: 500;
+}
+
+.episode-overview {
+  font-size: 0.76rem;
+  color: var(--watch-text-tertiary);
+  margin: 0;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Sidebar Loading */
+.sidebar-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  gap: 1rem;
+}
+
+.sidebar-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-top-color: var(--watch-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.sidebar-loading p {
+  font-size: 0.82rem;
+  color: var(--watch-text-tertiary);
+  margin: 0;
+}
+
+.sidebar-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+}
+
+.sidebar-empty p {
+  font-size: 0.85rem;
+  color: var(--watch-text-tertiary);
+  margin: 0;
 }
 
 /* ─── Loading State ─── */
@@ -302,39 +612,37 @@
 }
 
 .watch-loading p {
-  font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  color: var(--watch-text-tertiary);
   margin: 0;
   font-weight: 400;
   letter-spacing: 0.02em;
 }
 
 .watch-spinner {
-  width: 44px;
-  height: 44px;
-  border: 2.5px solid rgba(255, 255, 255, 0.08);
-  border-top-color: #e50914;
+  width: 40px;
+  height: 40px;
+  border: 2.5px solid rgba(255, 255, 255, 0.07);
+  border-top-color: var(--watch-accent);
   border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+  animation: spin 0.85s linear infinite;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-/* ─── Gradient Overlays (State 3 Only) ─── */
+/* ─── Gradient Overlays ─── */
 .watch-gradient-top {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 180px;
+  height: 160px;
   background: linear-gradient(
-    to bottom, 
-    rgba(0, 0, 0, 0.75) 0%,
-    rgba(0, 0, 0, 0.3) 50%, 
+    to bottom,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.25) 50%,
     transparent 100%
   );
   pointer-events: none;
@@ -346,11 +654,11 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 250px;
+  height: 220px;
   background: linear-gradient(
-    to top, 
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.4) 40%, 
+    to top,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.35) 40%,
     transparent 100%
   );
   pointer-events: none;
@@ -361,19 +669,28 @@
    Responsive Design
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
-  .watch-top-controls {
-    padding: 1rem;
-    flex-direction: column;
-    gap: 0.75rem;
+  :root {
+    --watch-sidebar-width: 320px;
   }
 
-  .watch-back-btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
+  .watch-top-controls {
+    padding: 0.85rem 1rem;
   }
 
   .watch-back-btn span {
     display: none;
+  }
+
+  .watch-back-btn {
+    padding: 0.55rem 0.75rem;
+  }
+
+  .watch-episodes-btn span {
+    display: none;
+  }
+
+  .watch-episodes-btn {
+    padding: 0.55rem 0.75rem;
   }
 
   .title-card {
@@ -389,43 +706,74 @@
   }
 
   .title-card-episode-name {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
 
   .title-card-overview {
     -webkit-line-clamp: 2;
-    font-size: 0.82rem;
-  }
-
-  /* Episode selector on mobile */
-  .episode-selector {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  .select-wrapper select {
-    min-width: unset;
     font-size: 0.8rem;
-    padding: 0.45rem 2rem 0.45rem 0.65rem;
+  }
+
+  .sidebar-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .sidebar-season-selector {
+    padding: 0.85rem 1.25rem;
+  }
+
+  .sidebar-episode-item {
+    padding: 0.75rem 1.25rem;
+    gap: 0.75rem;
+  }
+
+  .episode-thumb-wrapper {
+    width: 100px;
+    min-width: 100px;
+    height: 56px;
   }
 }
 
 @media (max-width: 480px) {
+  :root {
+    --watch-sidebar-width: 100%;
+  }
+
   .title-card-name {
     font-size: 1.15rem;
   }
 
   .title-card-meta {
-    gap: 0.5rem;
+    gap: 0.45rem;
   }
 
   .title-card-year,
   .title-card-rating,
   .title-card-genres {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
   }
 
-  .selector-group label {
-    font-size: 0.6rem;
+  .title-card-actions {
+    margin-top: 0.35rem;
+  }
+
+  .title-card-episodes-btn {
+    font-size: 0.82rem;
+    padding: 0.55rem 1.1rem;
+  }
+
+  .episode-thumb-wrapper {
+    width: 85px;
+    min-width: 85px;
+    height: 48px;
+  }
+
+  .episode-title {
+    font-size: 0.82rem;
+  }
+
+  .episode-overview {
+    -webkit-line-clamp: 1;
+    font-size: 0.7rem;
   }
 }
