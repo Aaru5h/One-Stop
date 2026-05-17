@@ -80,6 +80,10 @@ export const movieApi = {
   // Videos (trailers, clips)
   getVideos: (id, mediaType = 'movie') => 
     api.get(`/movies/${id}/videos`, { params: { mediaType } }),
+  
+  // Season details with episode list (TV shows)
+  getSeasonDetails: (id, seasonNumber) => 
+    api.get(`/movies/${id}/season/${seasonNumber}`),
 };
 
 export const searchApi = {

@@ -17,6 +17,7 @@ export const queryKeys = {
   search: (query, params) => ['search', query, params],
   watchlist: () => ['library', 'watchlist'],
   continueWatching: () => ['library', 'continueWatching'],
+  seasonDetails: (id, seasonNumber) => ['tv', id, 'season', seasonNumber],
 };
 
 // Trending movies hook
@@ -136,6 +137,16 @@ export function useMovieVideos(id, mediaType = 'movie') {
     queryFn: () => movieApi.getVideos(id, mediaType).then(res => res.data),
     enabled: !!id,
     staleTime: 30 * 60 * 1000, // 30 minutes - videos don't change often
+  });
+}
+
+// Season details hook — fetches real episode names & data for a TV season
+export function useSeasonDetails(tvId, seasonNumber) {
+  return useQuery({
+    queryKey: queryKeys.seasonDetails(tvId, seasonNumber),
+    queryFn: () => movieApi.getSeasonDetails(tvId, seasonNumber).then(res => res.data),
+    enabled: !!tvId && !!seasonNumber,
+    staleTime: 30 * 60 * 1000, // 30 minutes — season data is stable
   });
 }
 

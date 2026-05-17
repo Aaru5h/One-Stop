@@ -241,4 +241,22 @@ router.get('/:id/videos', async (req, res) => {
   }
 });
 
+// @route   GET /api/movies/:id/season/:seasonNumber
+// @desc    Get season details with episode list for a TV show
+// @access  Public
+router.get('/:id/season/:seasonNumber', async (req, res) => {
+  try {
+    const { id, seasonNumber } = req.params;
+    
+    const data = await tmdbService.getSeasonDetails(
+      parseInt(id), 
+      parseInt(seasonNumber)
+    );
+    res.json(data);
+  } catch (error) {
+    console.error('Season details error:', error);
+    res.status(500).json({ error: 'Failed to fetch season details' });
+  }
+});
+
 export default router;

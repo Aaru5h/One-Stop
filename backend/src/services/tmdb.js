@@ -87,6 +87,25 @@ const transformMovieDetails = (movie, credits = null, userLibrary = null) => {
     mediaType: movie.name ? 'tv' : 'movie'
   };
 
+  // Include real TV show season data when available
+  if (movie.number_of_seasons) {
+    transformed.numberOfSeasons = movie.number_of_seasons;
+    transformed.numberOfEpisodes = movie.number_of_episodes;
+    transformed.seasons = (movie.seasons || [])
+      .filter(s => s.season_number > 0) // Exclude "Specials" (season 0)
+      .map(s => ({
+        id: s.id,
+        seasonNumber: s.season_number,
+        name: s.name,
+        episodeCount: s.episode_count,
+        overview: s.overview || '',
+        posterPath: s.poster_path
+          ? `${IMAGE_BASE_URL}/${POSTER_SIZES.medium}${s.poster_path}`
+          : null,
+        airDate: s.air_date
+      }));
+  }
+
   // Add credits if available
   if (credits) {
     transformed.cast = credits.cast?.slice(0, 10).map(person => ({
@@ -281,6 +300,35 @@ export const tmdbService = {
         official: video.official,
         site: video.site,
         size: video.size // Quality: 360, 480, 720, 1080
+      }))
+    };
+  },
+
+  // Get season details with full episode list
+  async getSeasonDetails(tvId, seasonNumber) {
+    const response = await tmdbApi.get(`/tv/${tvId}/season/${seasonNumber}`);
+    const season = response.data;
+
+    return {
+      id: season.id,
+      seasonNumber: season.season_number,
+      name: season.name,
+      overview: season.overview || '',
+      airDate: season.air_date,
+      posterPath: season.poster_path
+        ? `${IMAGE_BASE_URL}/${POSTER_SIZES.medium}${season.poster_path}`
+        : null,
+      episodes: (season.episodes || []).map(ep => ({
+        id: ep.id,
+        episodeNumber: ep.episode_number,
+        name: ep.name,
+        overview: ep.overview || '',
+        stillPath: ep.still_path
+          ? `${IMAGE_BASE_URL}/${BACKDROP_SIZES.small}${ep.still_path}`
+          : null,
+        airDate: ep.air_date,
+        runtime: ep.runtime,
+        voteAverage: ep.vote_average
       }))
     };
   }
