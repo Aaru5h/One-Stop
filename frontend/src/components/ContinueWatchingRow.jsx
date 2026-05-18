@@ -178,10 +178,6 @@ export default function ContinueWatchingRow() {
 
   const items = data?.continueWatching || [];
 
-  // Don't render if not authenticated or no items (and not loading)
-  if (!isAuthenticated) return null;
-  if (!isLoading && items.length === 0) return null;
-
   const handleResume = useCallback((item) => {
     const url =
       item.mediaType === 'tv' && item.season
@@ -193,6 +189,10 @@ export default function ContinueWatchingRow() {
   const handleRemove = useCallback((item) => {
     removeItem.mutate(item.movieId);
   }, [removeItem]);
+
+  // Don't render if not authenticated or no items (and not loading)
+  if (!isAuthenticated) return null;
+  if (!isLoading && items.length === 0) return null;
 
   return (
     <section

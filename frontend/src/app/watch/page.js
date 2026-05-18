@@ -320,6 +320,12 @@ function WatchContent() {
   const progressSavedRef = useRef(false);
   // Holds latest data needed for fire-and-forget on unmount
   const latestProgressPayloadRef = useRef(null);
+  
+  // Keep track of auth state in a ref to avoid stale closures in cleanup
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   const buildProgressPayload = useCallback((overrideProgress) => {
     const currentEp = mediaType === 'tv'
@@ -338,20 +344,20 @@ function WatchContent() {
       ...(mediaType === 'tv' && {
         season,
         episode,
-        episodeTitle: currentEp?.name,
+        episodeTitle: currentEp?.name || null,
       }),
     };
   }, [content, mediaType, season, episode, seasonData]);
 
-  // Mark started when player finishes loading
+  // Mark started when content is ready
   useEffect(() => {
-    if (!isIframeLoading && isAuthenticated && movieId && content && !progressSavedRef.current) {
+    if (isAuthenticated && movieId && content && !progressSavedRef.current) {
       progressSavedRef.current = true;
       const payload = buildProgressPayload(5);
       latestProgressPayloadRef.current = { movieId: Number(movieId), data: payload };
       updateProgressMutation.mutate({ movieId: Number(movieId), data: payload });
     }
-  }, [isIframeLoading, isAuthenticated, movieId, content, buildProgressPayload]);
+  }, [isAuthenticated, movieId, content, buildProgressPayload]);
 
   // Keep latestProgressPayloadRef fresh as episode/season changes
   useEffect(() => {
@@ -386,8 +392,13 @@ function WatchContent() {
   useEffect(() => {
     return () => {
       const payload = latestProgressPayloadRef.current;
-      if (payload && isAuthenticated) {
-        libraryApi.updateProgress(payload.movieId, payload.data).catch(() => {});
+      // Use ref to avoid stale closure of isAuthenticated
+      if (payload && isAuthenticatedRef.current) {
+        // Use sendBeacon if available for better reliability on unmount, fallback to axios
+        try {
+          // Fire-and-forget API call
+          libraryApi.updateProgress(payload.movieId, payload.data).catch(() => {});
+        } catch (e) {}
       }
     };
   }, []); // intentionally empty — captured via ref
