@@ -126,7 +126,7 @@
 .watch-bottom-controls {
   position: absolute;
   bottom: 6px;
-  right: 200px;
+  right: 280px;
   z-index: 35;
   display: flex;
   align-items: center;
@@ -165,7 +165,7 @@
 
 @media (max-width: 768px) {
   .watch-bottom-controls {
-    right: 140px;
+    right: 200px;
     bottom: 4px;
   }
 
@@ -189,7 +189,7 @@
 
 @media (max-width: 480px) {
   .watch-bottom-controls {
-    right: 110px;
+    right: 170px;
     bottom: 3px;
   }
 }
