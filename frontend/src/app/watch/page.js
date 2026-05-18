@@ -396,9 +396,9 @@ function WatchContent() {
   const embedUrl = useMemo(() => {
     if (!movieId) return '';
     if (mediaType === 'tv') {
-      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=netflix_red&autoplay=1&episode_selector=1&next_button=1`;
+      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=e50914&nextEpisode=true&episodeSelector=true&autoplay=1`;
     }
-    return `https://www.vidking.net/embed/movie/${movieId}?color=netflix_red&autoplay=1`;
+    return `https://www.vidking.net/embed/movie/${movieId}?color=e50914&autoplay=1`;
   }, [movieId, mediaType, season, episode]);
 
   const handleBack = useCallback(() => {
