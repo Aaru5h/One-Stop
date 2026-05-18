@@ -122,11 +122,11 @@
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* ─── Bottom-Right Control Bar (Cineby-style inline) ─── */
+/* ─── Bottom-Right Control Bar (matches native player controls) ─── */
 .watch-bottom-controls {
   position: absolute;
-  bottom: 6px;
-  right: 280px;
+  bottom: 5px;
+  right: 180px;
   z-index: 35;
   display: flex;
   align-items: center;
@@ -138,58 +138,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   padding: 8px 10px;
-  transition: color 0.15s ease;
+  transition: color 0.2s ease, opacity 0.2s ease;
   font-family: inherit;
 }
 
 .watch-bar-btn:hover {
-  color: rgba(255, 255, 255, 1);
+  color: #fff;
 }
 
 .watch-bar-btn .icon-sm {
-  width: 24px;
-  height: 24px;
-}
-
-.watch-bar-btn--episodes {
-  font-size: 0.82rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  width: 26px;
+  height: 26px;
 }
 
 @media (max-width: 768px) {
   .watch-bottom-controls {
-    right: 200px;
+    right: 140px;
     bottom: 4px;
   }
 
   .watch-bar-btn {
-    padding: 6px 7px;
+    padding: 6px 8px;
   }
 
   .watch-bar-btn .icon-sm {
-    width: 20px;
-    height: 20px;
-  }
-
-  .watch-bar-btn--episodes {
-    font-size: 0.75rem;
-  }
-
-  .watch-bar-btn--episodes span {
-    display: none;
+    width: 22px;
+    height: 22px;
   }
 }
 
 @media (max-width: 480px) {
   .watch-bottom-controls {
-    right: 170px;
+    right: 110px;
     bottom: 3px;
   }
 }

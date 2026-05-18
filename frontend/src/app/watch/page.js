@@ -559,7 +559,7 @@ function WatchContent() {
               <motion.button
                 className="watch-bar-btn"
                 onClick={handleNextEpisode}
-                whileHover={{ scale: 1.1 }}
+                whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.9 }}
                 title="Next Episode"
               >
@@ -567,13 +567,13 @@ function WatchContent() {
               </motion.button>
             )}
             <motion.button
-              className="watch-bar-btn watch-bar-btn--episodes"
+              className="watch-bar-btn"
               onClick={() => setIsSidebarOpen(true)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.9 }}
+              title="Episodes"
             >
               <EpisodesIcon />
-              <span>Episodes</span>
             </motion.button>
           </motion.div>
         )}
