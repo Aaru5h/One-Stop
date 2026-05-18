@@ -17,17 +17,7 @@ const BackIcon = () => (
   </svg>
 );
 
-const EpisodesIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
-    <path d="M2 4h20v2H2V4zm0 7h20v2H2v-2zm0 7h14v2H2v-2z" />
-  </svg>
-);
 
-const NextIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
-    <path fillRule="evenodd" d="M13.28 11.47a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.69 12 7.97 8.28a.75.75 0 0 1 1.06-1.06l4.25 4.25Zm4.72-4.72a.75.75 0 0 1 .75.75v9a.75.75 0 0 1-1.5 0v-9a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
-  </svg>
-);
 
 const CloseIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
@@ -406,7 +396,7 @@ function WatchContent() {
   const embedUrl = useMemo(() => {
     if (!movieId) return '';
     if (mediaType === 'tv') {
-      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=netflix_red&autoplay=1&episode_selector=0&next_button=0`;
+      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=netflix_red&autoplay=1&episode_selector=1&next_button=1`;
     }
     return `https://www.vidking.net/embed/movie/${movieId}?color=netflix_red&autoplay=1`;
   }, [movieId, mediaType, season, episode]);
@@ -461,20 +451,7 @@ function WatchContent() {
   const title = content?.title || content?.name || 'Loading...';
   const realSeasons = content?.seasons || [];
 
-  const hasNextEpisode = useMemo(() => {
-    if (mediaType !== 'tv') return false;
-    if (seasonData?.episodes && episode < seasonData.episodes.length) return true;
-    return !!realSeasons.find((s) => s.season_number === season + 1);
-  }, [mediaType, seasonData, episode, realSeasons, season]);
 
-  const handleNextEpisode = useCallback(() => {
-    if (seasonData?.episodes && episode < seasonData.episodes.length) {
-      handleEpisodeChange(episode + 1);
-    } else {
-      const nextSeason = realSeasons.find((s) => s.season_number === season + 1);
-      if (nextSeason) handleSeasonChange(season + 1);
-    }
-  }, [seasonData, episode, realSeasons, season, handleEpisodeChange, handleSeasonChange]);
 
   // showOverlay: drives dim + title card + gradients (paused state)
   const showOverlay = showTitleCard || isSidebarOpen;
@@ -544,40 +521,7 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Bottom-Right Control Bar — fades with controls ─── */}
-      <AnimatePresence>
-        {mediaType === 'tv' && !isSidebarOpen && showControls && (
-          <motion.div
-            key="watch-bottom-controls"
-            className="watch-bottom-controls"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            {hasNextEpisode && (
-              <motion.button
-                className="watch-bar-btn"
-                onClick={handleNextEpisode}
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.9 }}
-                title="Next Episode"
-              >
-                <NextIcon />
-              </motion.button>
-            )}
-            <motion.button
-              className="watch-bar-btn"
-              onClick={() => setIsSidebarOpen(true)}
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.9 }}
-              title="Episodes"
-            >
-              <EpisodesIcon />
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
 
       {/* ─── Title Card (paused + 2.5s idle) ─── */}
       <AnimatePresence>
