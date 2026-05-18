@@ -339,19 +339,7 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
         {/* Action buttons */}
         {mediaType === 'tv' && (
           <div className="title-card-actions">
-            {hasNextEpisode && (
-              <motion.button
-                className="title-card-episodes-btn"
-                style={{ backgroundColor: 'var(--watch-accent)', borderColor: 'var(--watch-accent)', color: 'white' }}
-                onClick={onNextEpisode}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <NextIcon />
-                <span>Next Episode</span>
-              </motion.button>
-            )}
-            {/* Moved Episodes button to floating position per user request */}
+            {/* Buttons moved to bottom bar control group */}
           </div>
         )}
       </div>
@@ -583,41 +571,38 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Floating Episodes Button (Always Accessible) ─── */}
+      {/* ─── Bottom-Right Control Bar (Cineby-style inline buttons) ─── */}
       <AnimatePresence>
         {mediaType === 'tv' && !isSidebarOpen && (
-          <motion.button
-            key="floating-episodes-btn"
-            className="watch-floating-episodes-btn"
-            onClick={() => setIsSidebarOpen(true)}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <motion.div
+            key="watch-bottom-controls"
+            className="watch-bottom-controls"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
           >
-            <EpisodesIcon />
-            <span>Episodes</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Floating Next Button (Always Accessible) ─── */}
-      <AnimatePresence>
-        {mediaType === 'tv' && hasNextEpisode && !isSidebarOpen && (
-          <motion.button
-            key="floating-next-btn"
-            className="watch-floating-next-btn"
-            onClick={handleNextEpisode}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            title="Next Episode"
-          >
-            <NextIcon />
-          </motion.button>
+            {hasNextEpisode && (
+              <motion.button
+                className="watch-bar-btn"
+                onClick={handleNextEpisode}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                title="Next Episode"
+              >
+                <NextIcon />
+              </motion.button>
+            )}
+            <motion.button
+              className="watch-bar-btn watch-bar-btn--episodes"
+              onClick={() => setIsSidebarOpen(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <EpisodesIcon />
+              <span>Episodes</span>
+            </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
 

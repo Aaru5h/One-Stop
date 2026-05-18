@@ -122,82 +122,69 @@
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* ─── Floating Episodes Button ─── */
-.watch-floating-episodes-btn {
+/* ─── Bottom-Right Control Bar (Cineby-style inline) ─── */
+.watch-bottom-controls {
   position: absolute;
-  top: 1.5rem;
-  right: 6rem;
-  z-index: 30;
+  bottom: 0;
+  right: 0;
+  z-index: 35;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.2rem;
-  background: var(--watch-glass-bg);
-  backdrop-filter: var(--watch-glass-blur);
-  -webkit-backdrop-filter: var(--watch-glass-blur);
-  border: 1px solid var(--watch-glass-border);
-  border-radius: 50px;
-  color: var(--watch-text-primary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s var(--watch-transition);
-  letter-spacing: 0.01em;
-  font-family: inherit;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  gap: 0;
+  padding: 0 4px 6px 0;
+  pointer-events: auto;
 }
 
-.watch-floating-episodes-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-  .watch-floating-episodes-btn {
-    top: 1rem;
-    right: 4rem;
-    padding: 0.5rem 0.8rem;
-    font-size: 0.8rem;
-  }
-}
-
-/* ─── Floating Next Button ─── */
-.watch-floating-next-btn {
-  position: absolute;
-  bottom: 24px;
-  right: calc(100px + 24px); /* Approx position to the left of the captions button */
-  z-index: 30;
+.watch-bar-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: var(--watch-glass-bg);
-  backdrop-filter: var(--watch-glass-blur);
-  -webkit-backdrop-filter: var(--watch-glass-blur);
-  border: 1px solid var(--watch-glass-border);
-  border-radius: 50%;
+  gap: 6px;
+  background: none;
+  border: none;
   color: var(--watch-text-primary);
   cursor: pointer;
-  opacity: 0.6;
-  transition: all 0.25s var(--watch-transition);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+  font-family: inherit;
 }
 
-.watch-floating-next-btn:hover {
+.watch-bar-btn:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+}
+
+.watch-bar-btn .icon-sm {
+  width: 22px;
+  height: 22px;
+}
+
+.watch-bar-btn--episodes {
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: 768px) {
-  .watch-floating-next-btn {
-    bottom: 16px;
-    right: calc(80px + 16px);
-    width: 36px;
-    height: 36px;
+  .watch-bottom-controls {
+    padding: 0 2px 4px 0;
+  }
+
+  .watch-bar-btn {
+    padding: 8px 8px;
+  }
+
+  .watch-bar-btn .icon-sm {
+    width: 18px;
+    height: 18px;
+  }
+
+  .watch-bar-btn--episodes {
+    font-size: 0.78rem;
+  }
+
+  .watch-bar-btn--episodes span {
+    display: none;
   }
 }
 
@@ -736,14 +723,6 @@
   }
 
   .watch-back-btn {
-    padding: 0.55rem 0.75rem;
-  }
-
-  .watch-episodes-btn span {
-    display: none;
-  }
-
-  .watch-episodes-btn {
     padding: 0.55rem 0.75rem;
   }
 
