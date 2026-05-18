@@ -215,9 +215,20 @@ export function useContinueWatching() {
 
 export function useUpdateProgress() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ movieId, data }) => libraryApi.updateProgress(movieId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.continueWatching() });
+    }
+  });
+}
+
+export function useRemoveFromContinueWatching() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (movieId) => libraryApi.removeFromContinueWatching(movieId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.continueWatching() });
     }

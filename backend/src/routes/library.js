@@ -150,14 +150,17 @@ router.get('/continue-watching', async (req, res) => {
 router.put('/progress/:movieId', async (req, res) => {
   try {
     const { movieId } = req.params;
-    const { 
-      progress, 
-      currentTime, 
+    const {
+      progress,
+      currentTime,
       duration,
       title,
       posterPath,
       backdropPath,
-      mediaType = 'movie'
+      mediaType = 'movie',
+      season = null,
+      episode = null,
+      episodeTitle = null,
     } = req.body;
 
     let library = await Library.findOne({ userId: req.user._id });
@@ -180,6 +183,9 @@ router.put('/progress/:movieId', async (req, res) => {
       posterPath,
       backdropPath,
       mediaType,
+      season,
+      episode,
+      episodeTitle,
       lastWatched: new Date()
     };
 

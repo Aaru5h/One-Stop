@@ -6,6 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 import Hero from '@/components/Hero';
 import MovieRow, { MovieRowSkeleton } from '@/components/MovieRow';
 import MovieModal from '@/components/MovieModal';
+import ContinueWatchingRow from '@/components/ContinueWatchingRow';
 import { useTrending, usePopular, useTopRated, useNowPlaying, useMovieDetails, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
 
 // Genre configurations with IDs from TMDB
@@ -123,6 +124,9 @@ export default function HomePage() {
 
       {/* Content Rows */}
       <div className="relative z-10 -mt-32 space-y-8 pb-32">
+        {/* Continue Watching — only shown to authenticated users with in-progress content */}
+        <ContinueWatchingRow />
+
         {/* Trending Now */}
         {trendingLoading ? (
           <MovieRowSkeleton title="Trending Now" />

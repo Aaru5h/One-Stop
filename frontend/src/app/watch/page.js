@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMovieDetails, useSeasonDetails } from '@/hooks/useMovies';
+import { useMovieDetails, useSeasonDetails, useUpdateProgress } from '@/hooks/useMovies';
+import { useAuth } from '@/contexts/AuthContext';
+import { libraryApi } from '@/lib/api';
 import './watch.css';
 
 // ─────────────────────────────────────────────────────────
-// Icon Components (Single Responsibility Principle)
-// Each icon is a pure, stateless component with one job.
+// Icon Components
 // ─────────────────────────────────────────────────────────
 const BackIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
@@ -48,31 +49,28 @@ const LoadingSpinner = () => (
 );
 
 // ─────────────────────────────────────────────────────────
-// Custom Hook: usePlayerState (Observer Pattern)
-// 
-// Listens to Vidking player's postMessage events for 
-// real-time play/pause detection. No more guessing — 
-// we get actual 'play', 'pause', 'ended' events.
+// usePlayerState
 //
-// State Machine (Strategy Pattern):
-//   PLAYING  → clean screen, cursor hidden
-//   PAUSED   → after 2.5s idle → title card + controls
+// Three-state HUD with Cineby-style control visibility:
+//   PLAYING + mouse idle 3s  → controls fade out
+//   PLAYING + mouse move     → controls show (reset 3s timer)
+//   PAUSED                   → controls always visible
+//   PAUSED + idle 2.5s       → title card appears
 // ─────────────────────────────────────────────────────────
 function usePlayerState() {
   const [isPaused, setIsPaused] = useState(false);
   const [showTitleCard, setShowTitleCard] = useState(false);
+  const [showControls, setShowControls] = useState(false);
   const titleCardTimerRef = useRef(null);
+  const controlsTimerRef = useRef(null);
   const iframeRef = useRef(null);
 
-  // Listen for Vidking postMessage events (Observer Pattern)
   useEffect(() => {
     const handleMessage = (event) => {
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        
         if (data && typeof data === 'object') {
           const eventName = data.event || data.type || data.action;
-          
           if (eventName === 'play' || eventName === 'playing') {
             setIsPaused(false);
           } else if (eventName === 'pause' || eventName === 'paused') {
@@ -85,59 +83,50 @@ function usePlayerState() {
         // Non-JSON message, ignore
       }
     };
-
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // When paused → start 2.5s countdown → show title card
   useEffect(() => {
     if (isPaused) {
-      titleCardTimerRef.current = setTimeout(() => {
-        setShowTitleCard(true);
-      }, 2500);
+      // Paused: keep controls visible, start title card countdown
+      setShowControls(true);
+      clearTimeout(controlsTimerRef.current);
+      clearTimeout(titleCardTimerRef.current);
+      titleCardTimerRef.current = setTimeout(() => setShowTitleCard(true), 2500);
     } else {
+      // Playing: hide title card, start controls fade-out timer
       setShowTitleCard(false);
-      if (titleCardTimerRef.current) {
-        clearTimeout(titleCardTimerRef.current);
-        titleCardTimerRef.current = null;
-      }
+      clearTimeout(titleCardTimerRef.current);
+      titleCardTimerRef.current = null;
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
     }
-
     return () => {
-      if (titleCardTimerRef.current) {
-        clearTimeout(titleCardTimerRef.current);
-      }
+      clearTimeout(titleCardTimerRef.current);
+      clearTimeout(controlsTimerRef.current);
     };
   }, [isPaused]);
 
-  // Reset 2.5s timer on mouse activity while paused
   const handleMouseActivity = useCallback(() => {
-    if (!isPaused) return;
-
-    setShowTitleCard(false);
-    if (titleCardTimerRef.current) {
+    setShowControls(true);
+    if (!isPaused) {
+      // While playing: reset the 3s hide timer on every mouse move
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+    } else {
+      // While paused: mouse activity resets title card delay
+      setShowTitleCard(false);
       clearTimeout(titleCardTimerRef.current);
+      titleCardTimerRef.current = setTimeout(() => setShowTitleCard(true), 2500);
     }
-    titleCardTimerRef.current = setTimeout(() => {
-      setShowTitleCard(true);
-    }, 2500);
   }, [isPaused]);
 
-  return { isPaused, showTitleCard, handleMouseActivity, setIsPaused, iframeRef };
+  return { isPaused, showTitleCard, showControls, handleMouseActivity, setIsPaused, iframeRef };
 }
 
 // ─────────────────────────────────────────────────────────
-// Episode Sidebar Component (Cineby-Inspired)
-//
-// Slides in from the right, showing:
-//   - Season dropdown at the top
-//   - Scrollable episode list with thumbnails
-//   - "WATCHING" badge on the active episode
-//   - Click to switch episodes instantly
-//
-// Follows Interface Segregation: accepts only the 
-// minimal props it needs.
+// Episode Sidebar Component
 // ─────────────────────────────────────────────────────────
 function EpisodeSidebar({
   movieId,
@@ -153,7 +142,6 @@ function EpisodeSidebar({
   const episodes = seasonData?.episodes || [];
   const activeEpisodeRef = useRef(null);
 
-  // Auto-scroll to the currently watching episode
   useEffect(() => {
     if (activeEpisodeRef.current) {
       activeEpisodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -168,7 +156,6 @@ function EpisodeSidebar({
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 28, stiffness: 300 }}
     >
-      {/* Sidebar Header */}
       <div className="sidebar-header">
         <h2 className="sidebar-title">Episodes</h2>
         <motion.button
@@ -181,7 +168,6 @@ function EpisodeSidebar({
         </motion.button>
       </div>
 
-      {/* Season Selector */}
       <div className="sidebar-season-selector">
         <div className="sidebar-select-wrapper">
           <select
@@ -199,12 +185,10 @@ function EpisodeSidebar({
         </div>
       </div>
 
-      {/* Season Overview */}
       {seasonData?.overview && (
         <p className="sidebar-season-overview">{seasonData.overview}</p>
       )}
 
-      {/* Episode List */}
       <div className="sidebar-episode-list">
         {isLoadingEpisodes ? (
           <div className="sidebar-loading">
@@ -223,46 +207,26 @@ function EpisodeSidebar({
                 key={ep.episodeNumber}
                 ref={isActive ? activeEpisodeRef : null}
                 className={`sidebar-episode-item ${isActive ? 'is-active' : ''}`}
-                onClick={() => {
-                  if (!isActive) {
-                    onEpisodeChange(ep.episodeNumber);
-                  }
-                }}
+                onClick={() => { if (!isActive) onEpisodeChange(ep.episodeNumber); }}
                 whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
                 whileTap={{ scale: 0.98 }}
                 layout
               >
-                {/* Episode Thumbnail */}
                 <div className="episode-thumb-wrapper">
                   {ep.stillPath ? (
-                    <img
-                      src={ep.stillPath}
-                      alt={ep.name}
-                      className="episode-thumb"
-                      loading="lazy"
-                    />
+                    <img src={ep.stillPath} alt={ep.name} className="episode-thumb" loading="lazy" />
                   ) : (
                     <div className="episode-thumb-placeholder">
                       <span>{ep.episodeNumber}</span>
                     </div>
                   )}
-                  {isActive && (
-                    <span className="episode-watching-badge">WATCHING</span>
-                  )}
+                  {isActive && <span className="episode-watching-badge">WATCHING</span>}
                   <span className="episode-number-badge">{ep.episodeNumber}</span>
                 </div>
-
-                {/* Episode Info */}
                 <div className="episode-info">
-                  <h4 className="episode-title">
-                    {ep.name || `Episode ${ep.episodeNumber}`}
-                  </h4>
-                  {ep.runtime && (
-                    <span className="episode-runtime">{ep.runtime} min</span>
-                  )}
-                  {ep.overview && (
-                    <p className="episode-overview">{ep.overview}</p>
-                  )}
+                  <h4 className="episode-title">{ep.name || `Episode ${ep.episodeNumber}`}</h4>
+                  {ep.runtime && <span className="episode-runtime">{ep.runtime} min</span>}
+                  {ep.overview && <p className="episode-overview">{ep.overview}</p>}
                 </div>
               </motion.button>
             );
@@ -274,14 +238,10 @@ function EpisodeSidebar({
 }
 
 // ─────────────────────────────────────────────────────────
-// Netflix-Style Title Card Component
-// Shown only in State 3 (paused + 2.5s idle).
-// Includes an "Episodes" button for TV shows.
+// Title Card Component
 // ─────────────────────────────────────────────────────────
-function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpisodes, hasNextEpisode, onNextEpisode }) {
-  const currentEpisode = seasonData?.episodes?.find(
-    (ep) => ep.episodeNumber === episode
-  );
+function TitleCard({ content, mediaType, season, episode, seasonData }) {
+  const currentEpisode = seasonData?.episodes?.find((ep) => ep.episodeNumber === episode);
 
   return (
     <motion.div
@@ -292,35 +252,23 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
       transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       <div className="title-card-content">
-        <h1 className="title-card-name">
-          {content?.title || content?.name || ''}
-        </h1>
+        <h1 className="title-card-name">{content?.title || content?.name || ''}</h1>
 
         {mediaType === 'tv' && currentEpisode && (
           <div className="title-card-episode">
-            <span className="title-card-episode-tag">
-              S{season} E{episode}
-            </span>
-            <span className="title-card-episode-name">
-              {currentEpisode.name}
-            </span>
+            <span className="title-card-episode-tag">S{season} E{episode}</span>
+            <span className="title-card-episode-name">{currentEpisode.name}</span>
           </div>
         )}
 
-        {content?.tagline && (
-          <p className="title-card-tagline">{content.tagline}</p>
-        )}
+        {content?.tagline && <p className="title-card-tagline">{content.tagline}</p>}
 
         <div className="title-card-meta">
           {content?.releaseDate && (
-            <span className="title-card-year">
-              {new Date(content.releaseDate).getFullYear()}
-            </span>
+            <span className="title-card-year">{new Date(content.releaseDate).getFullYear()}</span>
           )}
           {content?.voteAverage > 0 && (
-            <span className="title-card-rating">
-              ★ {content.voteAverage.toFixed(1)}
-            </span>
+            <span className="title-card-rating">★ {content.voteAverage.toFixed(1)}</span>
           )}
           {content?.genres?.length > 0 && (
             <span className="title-card-genres">
@@ -335,59 +283,115 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
         {!currentEpisode?.overview && content?.overview && (
           <p className="title-card-overview">{content.overview}</p>
         )}
-
-        {/* Action buttons */}
-        {mediaType === 'tv' && (
-          <div className="title-card-actions">
-            {/* Buttons moved to bottom bar control group */}
-          </div>
-        )}
       </div>
     </motion.div>
   );
 }
 
 // ─────────────────────────────────────────────────────────
-// Main Watch Page Component (Facade Pattern)
-//
-// Orchestrates all sub-components and manages global state.
-// Encapsulates complex interactions between:
-//   - Vidking iframe player
-//   - postMessage event stream
-//   - Episode sidebar panel
-//   - Title card overlay
-//   - Keyboard/mouse interaction
-//
-// Dependency Inversion: UI depends on abstractions
-// (hooks/api) not concrete TMDB implementation.
+// Main Watch Page
 // ─────────────────────────────────────────────────────────
 function WatchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { isAuthenticated } = useAuth();
 
   const movieId = searchParams.get('id');
   const mediaType = searchParams.get('type') || 'movie';
   const initialSeason = Number(searchParams.get('s')) || 1;
   const initialEpisode = Number(searchParams.get('e')) || 1;
 
-  // State
   const [season, setSeason] = useState(initialSeason);
   const [episode, setEpisode] = useState(initialEpisode);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Player state (3-state HUD + Vidking postMessage tracking)
-  const { isPaused, showTitleCard, handleMouseActivity, setIsPaused, iframeRef } =
+  const { isPaused, showTitleCard, showControls, handleMouseActivity, setIsPaused, iframeRef } =
     usePlayerState();
 
-  // Data fetching (Dependency Inversion — abstractions, not implementations)
   const { data: content, isLoading: contentLoading } = useMovieDetails(movieId, mediaType);
   const { data: seasonData, isLoading: isLoadingEpisodes } = useSeasonDetails(
     mediaType === 'tv' ? movieId : null,
     mediaType === 'tv' ? season : null
   );
 
-  // Vidking embed URL (replaces 2embed.cc)
+  // ── Progress tracking ──
+  const updateProgressMutation = useUpdateProgress();
+  const progressSavedRef = useRef(false);
+  // Holds latest data needed for fire-and-forget on unmount
+  const latestProgressPayloadRef = useRef(null);
+
+  const buildProgressPayload = useCallback((overrideProgress) => {
+    const currentEp = mediaType === 'tv'
+      ? seasonData?.episodes?.find((ep) => ep.episodeNumber === episode)
+      : null;
+    return {
+      title: content?.title || content?.name,
+      posterPath: content?.posterPath,
+      backdropPath: content?.backdropPath,
+      mediaType,
+      progress: overrideProgress ?? 5,
+      currentTime: 0,
+      duration: mediaType === 'tv'
+        ? (currentEp?.runtime || 24) * 60
+        : (content?.runtime || 120) * 60,
+      ...(mediaType === 'tv' && {
+        season,
+        episode,
+        episodeTitle: currentEp?.name,
+      }),
+    };
+  }, [content, mediaType, season, episode, seasonData]);
+
+  // Mark started when player finishes loading
+  useEffect(() => {
+    if (!isIframeLoading && isAuthenticated && movieId && content && !progressSavedRef.current) {
+      progressSavedRef.current = true;
+      const payload = buildProgressPayload(5);
+      latestProgressPayloadRef.current = { movieId: Number(movieId), data: payload };
+      updateProgressMutation.mutate({ movieId: Number(movieId), data: payload });
+    }
+  }, [isIframeLoading, isAuthenticated, movieId, content, buildProgressPayload]);
+
+  // Keep latestProgressPayloadRef fresh as episode/season changes
+  useEffect(() => {
+    if (isAuthenticated && movieId && content) {
+      latestProgressPayloadRef.current = {
+        movieId: Number(movieId),
+        data: buildProgressPayload(5),
+      };
+    }
+  }, [season, episode, isAuthenticated, movieId, content, buildProgressPayload]);
+
+  // Mark complete when ended event fires
+  useEffect(() => {
+    const handleMessage = (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data && (data.event === 'ended' || data.type === 'ended' || data.action === 'ended')) {
+          if (isAuthenticated && movieId && content) {
+            updateProgressMutation.mutate({
+              movieId: Number(movieId),
+              data: buildProgressPayload(100),
+            });
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isAuthenticated, movieId, content, buildProgressPayload]);
+
+  // Fire-and-forget save on page unmount
+  useEffect(() => {
+    return () => {
+      const payload = latestProgressPayloadRef.current;
+      if (payload && isAuthenticated) {
+        libraryApi.updateProgress(payload.movieId, payload.data).catch(() => {});
+      }
+    };
+  }, []); // intentionally empty — captured via ref
+
   const embedUrl = useMemo(() => {
     if (!movieId) return '';
     if (mediaType === 'tv') {
@@ -396,78 +400,49 @@ function WatchContent() {
     return `https://www.vidking.net/embed/movie/${movieId}?color=netflix_red&autoplay=1`;
   }, [movieId, mediaType, season, episode]);
 
-  // ── Navigation ──
   const handleBack = useCallback(() => {
-    if (window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/');
-    }
+    if (window.history.length > 1) router.back();
+    else router.push('/');
   }, [router]);
 
-  // ── Episode/Season Handlers ──
-  const handleSeasonChange = useCallback(
-    (newSeason) => {
-      setSeason(newSeason);
-      setEpisode(1);
-      setIsIframeLoading(true);
-      setIsPaused(false);
-      router.replace(
-        `/watch?id=${movieId}&type=${mediaType}&s=${newSeason}&e=1`,
-        { scroll: false }
-      );
-    },
-    [movieId, mediaType, router, setIsPaused]
-  );
+  const handleSeasonChange = useCallback((newSeason) => {
+    setSeason(newSeason);
+    setEpisode(1);
+    setIsIframeLoading(true);
+    setIsPaused(false);
+    progressSavedRef.current = false;
+    router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${newSeason}&e=1`, { scroll: false });
+  }, [movieId, mediaType, router, setIsPaused]);
 
-  const handleEpisodeChange = useCallback(
-    (newEpisode) => {
-      setEpisode(newEpisode);
-      setIsIframeLoading(true);
-      setIsPaused(false);
-      setIsSidebarOpen(false); // Close sidebar on episode change
-      router.replace(
-        `/watch?id=${movieId}&type=${mediaType}&s=${season}&e=${newEpisode}`,
-        { scroll: false }
-      );
-    },
-    [movieId, mediaType, season, router, setIsPaused]
-  );
+  const handleEpisodeChange = useCallback((newEpisode) => {
+    setEpisode(newEpisode);
+    setIsIframeLoading(true);
+    setIsPaused(false);
+    setIsSidebarOpen(false);
+    progressSavedRef.current = false;
+    router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${season}&e=${newEpisode}`, { scroll: false });
+  }, [movieId, mediaType, season, router, setIsPaused]);
 
-  // ── Keyboard Navigation ──
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (isSidebarOpen) {
-          setIsSidebarOpen(false);
-        } else {
-          handleBack();
-        }
+        if (isSidebarOpen) setIsSidebarOpen(false);
+        else handleBack();
       }
     };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleBack, isSidebarOpen]);
 
-  // ── Prevent body scroll ──
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
+    return () => { document.body.style.overflow = 'unset'; };
   }, []);
 
-  // ── Iframe load handler ──
-  const handleIframeLoad = useCallback(() => {
-    setIsIframeLoading(false);
-  }, []);
+  const handleIframeLoad = useCallback(() => setIsIframeLoading(false), []);
 
-  // ── Redirect if no movie ID ──
   useEffect(() => {
-    if (!movieId) {
-      router.push('/');
-    }
+    if (!movieId) router.push('/');
   }, [movieId, router]);
 
   if (!movieId) return null;
@@ -475,47 +450,34 @@ function WatchContent() {
   const title = content?.title || content?.name || 'Loading...';
   const realSeasons = content?.seasons || [];
 
-  // ── Calculate Next Episode ──
   const hasNextEpisode = useMemo(() => {
     if (mediaType !== 'tv') return false;
-    
-    // Check if there are more episodes in the current season
-    if (seasonData?.episodes && episode < seasonData.episodes.length) {
-      return true;
-    }
-    
-    // Check if there is a next season
-    const nextSeason = realSeasons.find(s => s.season_number === season + 1);
-    if (nextSeason) {
-      return true;
-    }
-    
-    return false;
+    if (seasonData?.episodes && episode < seasonData.episodes.length) return true;
+    return !!realSeasons.find((s) => s.season_number === season + 1);
   }, [mediaType, seasonData, episode, realSeasons, season]);
 
   const handleNextEpisode = useCallback(() => {
     if (seasonData?.episodes && episode < seasonData.episodes.length) {
       handleEpisodeChange(episode + 1);
     } else {
-      const nextSeason = realSeasons.find(s => s.season_number === season + 1);
-      if (nextSeason) {
-        handleSeasonChange(season + 1);
-      }
+      const nextSeason = realSeasons.find((s) => s.season_number === season + 1);
+      if (nextSeason) handleSeasonChange(season + 1);
     }
   }, [seasonData, episode, realSeasons, season, handleEpisodeChange, handleSeasonChange]);
 
-  // Determine HUD visibility states
+  // showOverlay: drives dim + title card + gradients (paused state)
   const showOverlay = showTitleCard || isSidebarOpen;
+  // showControls: drives back button + bottom bar (hover or paused)
+  const showCursor = showOverlay || showControls;
 
   return (
     <div
-      className={`watch-container ${isPaused ? 'is-paused' : 'is-playing'} ${showOverlay ? 'show-overlay' : ''}`}
+      className={`watch-container ${isPaused ? 'is-paused' : 'is-playing'} ${showCursor ? 'show-overlay' : ''}`}
       onMouseMove={handleMouseActivity}
     >
-      {/* ─── Video Player (Always visible) ─── */}
+      {/* ─── Video Player ─── */}
       <div className="watch-player-wrapper">
         {(contentLoading || isIframeLoading) && <LoadingSpinner />}
-
         <motion.div
           className="watch-player"
           initial={{ opacity: 0, scale: 0.98 }}
@@ -535,7 +497,7 @@ function WatchContent() {
         </motion.div>
       </div>
 
-      {/* ─── Dimmed Overlay (Paused state or sidebar open) ─── */}
+      {/* ─── Dimmed Overlay (paused or sidebar) ─── */}
       <AnimatePresence>
         {showOverlay && (
           <motion.div
@@ -548,15 +510,15 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Top Controls (Visible when title card or sidebar) ─── */}
+      {/* ─── Top Controls (back button) — visible when controls shown ─── */}
       <AnimatePresence>
-        {showOverlay && (
+        {(showControls || isSidebarOpen) && (
           <motion.div
             className="watch-top-controls"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
           >
             <motion.button
               className="watch-back-btn"
@@ -571,16 +533,16 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Bottom-Right Control Bar (Cineby-style inline buttons) ─── */}
+      {/* ─── Bottom-Right Control Bar — fades with controls ─── */}
       <AnimatePresence>
-        {mediaType === 'tv' && !isSidebarOpen && (
+        {mediaType === 'tv' && !isSidebarOpen && showControls && (
           <motion.div
             key="watch-bottom-controls"
             className="watch-bottom-controls"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.25 }}
           >
             {hasNextEpisode && (
               <motion.button
@@ -606,7 +568,7 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Netflix Title Card (Paused + 2.5s idle, not when sidebar open) ─── */}
+      {/* ─── Title Card (paused + 2.5s idle) ─── */}
       <AnimatePresence>
         {showTitleCard && content && !isSidebarOpen && (
           <TitleCard
@@ -615,14 +577,11 @@ function WatchContent() {
             season={season}
             episode={episode}
             seasonData={seasonData}
-            onOpenEpisodes={() => setIsSidebarOpen(true)}
-            hasNextEpisode={hasNextEpisode}
-            onNextEpisode={handleNextEpisode}
           />
         )}
       </AnimatePresence>
 
-      {/* ─── Episode Sidebar (Cineby-style slide-in panel) ─── */}
+      {/* ─── Episode Sidebar ─── */}
       <AnimatePresence>
         {isSidebarOpen && mediaType === 'tv' && (
           <EpisodeSidebar
@@ -639,7 +598,7 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Gradient overlays (readability) ─── */}
+      {/* ─── Gradient Overlays ─── */}
       <AnimatePresence>
         {showOverlay && (
           <>

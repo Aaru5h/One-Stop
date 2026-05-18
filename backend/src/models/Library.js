@@ -32,18 +32,31 @@ const continueWatchingSchema = new mongoose.Schema({
   posterPath: String,
   backdropPath: String,
   progress: {
-    type: Number, // Percentage watched (0-100)
+    type: Number,
     default: 0,
     min: 0,
     max: 100
   },
   currentTime: {
-    type: Number, // Seconds into the video
+    type: Number,
     default: 0
   },
   duration: {
-    type: Number, // Total duration in seconds
+    type: Number,
     default: 0
+  },
+  // TV show episode tracking
+  season: {
+    type: Number,
+    default: null
+  },
+  episode: {
+    type: Number,
+    default: null
+  },
+  episodeTitle: {
+    type: String,
+    default: null
   },
   lastWatched: {
     type: Date,
