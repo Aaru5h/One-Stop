@@ -22,6 +22,12 @@ const EpisodesIcon = () => (
   </svg>
 );
 
+const NextIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
+    <path fillRule="evenodd" d="M13.28 11.47a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.69 12 7.97 8.28a.75.75 0 0 1 1.06-1.06l4.25 4.25Zm4.72-4.72a.75.75 0 0 1 .75.75v9a.75.75 0 0 1-1.5 0v-9a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
+  </svg>
+);
+
 const CloseIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
     <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
@@ -272,7 +278,7 @@ function EpisodeSidebar({
 // Shown only in State 3 (paused + 2.5s idle).
 // Includes an "Episodes" button for TV shows.
 // ─────────────────────────────────────────────────────────
-function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpisodes }) {
+function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpisodes, hasNextEpisode, onNextEpisode }) {
   const currentEpisode = seasonData?.episodes?.find(
     (ep) => ep.episodeNumber === episode
   );
@@ -333,6 +339,18 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
         {/* Action buttons */}
         {mediaType === 'tv' && (
           <div className="title-card-actions">
+            {hasNextEpisode && (
+              <motion.button
+                className="title-card-episodes-btn"
+                style={{ backgroundColor: 'var(--watch-accent)', borderColor: 'var(--watch-accent)', color: 'white' }}
+                onClick={onNextEpisode}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <NextIcon />
+                <span>Next Episode</span>
+              </motion.button>
+            )}
             {/* Moved Episodes button to floating position per user request */}
           </div>
         )}
@@ -469,6 +487,35 @@ function WatchContent() {
   const title = content?.title || content?.name || 'Loading...';
   const realSeasons = content?.seasons || [];
 
+  // ── Calculate Next Episode ──
+  const hasNextEpisode = useMemo(() => {
+    if (mediaType !== 'tv') return false;
+    
+    // Check if there are more episodes in the current season
+    if (seasonData?.episodes && episode < seasonData.episodes.length) {
+      return true;
+    }
+    
+    // Check if there is a next season
+    const nextSeason = realSeasons.find(s => s.season_number === season + 1);
+    if (nextSeason) {
+      return true;
+    }
+    
+    return false;
+  }, [mediaType, seasonData, episode, realSeasons, season]);
+
+  const handleNextEpisode = useCallback(() => {
+    if (seasonData?.episodes && episode < seasonData.episodes.length) {
+      handleEpisodeChange(episode + 1);
+    } else {
+      const nextSeason = realSeasons.find(s => s.season_number === season + 1);
+      if (nextSeason) {
+        handleSeasonChange(season + 1);
+      }
+    }
+  }, [seasonData, episode, realSeasons, season, handleEpisodeChange, handleSeasonChange]);
+
   // Determine HUD visibility states
   const showOverlay = showTitleCard || isSidebarOpen;
 
@@ -555,6 +602,25 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
+      {/* ─── Floating Next Button (Always Accessible) ─── */}
+      <AnimatePresence>
+        {mediaType === 'tv' && hasNextEpisode && !isSidebarOpen && (
+          <motion.button
+            key="floating-next-btn"
+            className="watch-floating-next-btn"
+            onClick={handleNextEpisode}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title="Next Episode"
+          >
+            <NextIcon />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* ─── Netflix Title Card (Paused + 2.5s idle, not when sidebar open) ─── */}
       <AnimatePresence>
         {showTitleCard && content && !isSidebarOpen && (
@@ -565,6 +631,8 @@ function WatchContent() {
             episode={episode}
             seasonData={seasonData}
             onOpenEpisodes={() => setIsSidebarOpen(true)}
+            hasNextEpisode={hasNextEpisode}
+            onNextEpisode={handleNextEpisode}
           />
         )}
       </AnimatePresence>
