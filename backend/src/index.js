@@ -1,3 +1,6 @@
+console.error("ERROR: This Express backend is deactivated. The backend has been migrated to Next.js API Routes in frontend/src/app/api/.");
+process.exit(1);
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

@@ -5,8 +5,8 @@
     "main": "src/index.js",
     "type": "module",
     "scripts": {
-        "start": "node src/index.js",
-        "dev": "nodemon src/index.js"
+        "start": "echo \"ERROR: Backend has been migrated to Next.js. Run the unified frontend/ service instead.\" && exit 1",
+        "dev": "echo \"ERROR: Backend has been migrated to Next.js. Run the unified frontend/ service instead.\" && exit 1"
     },
     "dependencies": {
         "axios": "^1.7.9",
