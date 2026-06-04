@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMovieDetails, useSeasonDetails, useUpdateProgress } from '@/hooks/useMovies';
+import { useMovieDetails, useSeasonDetails, useUpdateProgress, useProgress } from '@/hooks/useMovies';
 import { useAuth } from '@/contexts/AuthContext';
 import { libraryApi } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import './watch.css';
 
 // ─────────────────────────────────────────────────────────
@@ -16,8 +17,6 @@ const BackIcon = () => (
     <path fillRule="evenodd" d="M11.03 3.97a.75.75 0 010 1.06l-6.22 6.22H21a.75.75 0 010 1.5H4.81l6.22 6.22a.75.75 0 11-1.06 1.06l-7.5-7.5a.75.75 0 010-1.06l7.5-7.5a.75.75 0 011.06 0z" clipRule="evenodd" />
   </svg>
 );
-
-
 
 const CloseIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
@@ -38,6 +37,36 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Helper to parse message events from Vidking iframe player
+function parsePlayerMessage(event) {
+  try {
+    const parsed = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    // Check if nested PLAYER_EVENT format
+    if (parsed.type === 'PLAYER_EVENT' && parsed.data && typeof parsed.data === 'object') {
+      return {
+        eventName: parsed.data.event || parsed.data.type || parsed.data.action,
+        currentTime: parsed.data.currentTime,
+        duration: parsed.data.duration,
+        progress: parsed.data.progress,
+        data: parsed.data
+      };
+    }
+
+    // Flat format
+    return {
+      eventName: parsed.event || parsed.type || parsed.action,
+      currentTime: parsed.currentTime,
+      duration: parsed.duration,
+      progress: parsed.progress,
+      data: parsed
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // usePlayerState
 //
@@ -57,20 +86,16 @@ function usePlayerState() {
 
   useEffect(() => {
     const handleMessage = (event) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data && typeof data === 'object') {
-          const eventName = data.event || data.type || data.action;
-          if (eventName === 'play' || eventName === 'playing') {
-            setIsPaused(false);
-          } else if (eventName === 'pause' || eventName === 'paused') {
-            setIsPaused(true);
-          } else if (eventName === 'ended') {
-            setIsPaused(true);
-          }
-        }
-      } catch {
-        // Non-JSON message, ignore
+      const parsed = parsePlayerMessage(event);
+      if (!parsed) return;
+
+      const { eventName } = parsed;
+      if (eventName === 'play' || eventName === 'playing') {
+        setIsPaused(false);
+      } else if (eventName === 'pause' || eventName === 'paused') {
+        setIsPaused(true);
+      } else if (eventName === 'ended') {
+        setIsPaused(true);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -285,16 +310,21 @@ function WatchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   const movieId = searchParams.get('id');
   const mediaType = searchParams.get('type') || 'movie';
-  const initialSeason = Number(searchParams.get('s')) || 1;
-  const initialEpisode = Number(searchParams.get('e')) || 1;
+  const urlSeason = searchParams.get('s') ? Number(searchParams.get('s')) : null;
+  const urlEpisode = searchParams.get('e') ? Number(searchParams.get('e')) : null;
 
-  const [season, setSeason] = useState(initialSeason);
-  const [episode, setEpisode] = useState(initialEpisode);
+  const [season, setSeason] = useState(urlSeason || 1);
+  const [episode, setEpisode] = useState(urlEpisode || 1);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Resume states
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [startTime, setStartTime] = useState(0);
 
   const { isPaused, showTitleCard, showControls, handleMouseActivity, setIsPaused, iframeRef } =
     usePlayerState();
@@ -305,101 +335,217 @@ function WatchContent() {
     mediaType === 'tv' ? season : null
   );
 
-  // ── Progress tracking ──
-  const updateProgressMutation = useUpdateProgress();
-  const progressSavedRef = useRef(false);
-  // Holds latest data needed for fire-and-forget on unmount
-  const latestProgressPayloadRef = useRef(null);
-  
-  // Keep track of auth state in a ref to avoid stale closures in cleanup
-  const isAuthenticatedRef = useRef(isAuthenticated);
-  useEffect(() => {
-    isAuthenticatedRef.current = isAuthenticated;
-  }, [isAuthenticated]);
+  // Fetch watch progress from backend
+  const { data: progressQueryData, isLoading: progressQueryLoading } = useProgress(
+    isAuthenticated ? movieId : null
+  );
 
-  const buildProgressPayload = useCallback((overrideProgress) => {
+  // Refs for tracking playback variables without triggering React re-renders or closures
+  const contentRef = useRef(content);
+  const seasonRef = useRef(season);
+  const episodeRef = useRef(episode);
+  const seasonDataRef = useRef(seasonData);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  const currentPlaybackStateRef = useRef({ currentTime: 0, duration: 0, progress: 0 });
+  const lastSavedTimeRef = useRef(0);
+
+  useEffect(() => { contentRef.current = content; }, [content]);
+  useEffect(() => { seasonRef.current = season; }, [season]);
+  useEffect(() => { episodeRef.current = episode; }, [episode]);
+  useEffect(() => { seasonDataRef.current = seasonData; }, [seasonData]);
+  useEffect(() => { isAuthenticatedRef.current = isAuthenticated; }, [isAuthenticated]);
+
+  // Initializing Starting Episode and Start Time
+  useEffect(() => {
+    if (contentLoading || (isAuthenticated && progressQueryLoading)) return;
+    if (isInitialized) return;
+
+    let startS = urlSeason || 1;
+    let startE = urlEpisode || 1;
+    let startT = 0;
+
+    const saved = progressQueryData?.progress;
+    if (saved && saved.movieId === Number(movieId)) {
+      if (mediaType === 'tv') {
+        if (urlSeason !== null && urlEpisode !== null) {
+          // If explicit season/episode in URL, resume ONLY if it matches saved
+          if (urlSeason === saved.season && urlEpisode === saved.episode) {
+            startT = saved.currentTime || 0;
+            if (saved.progress >= 95) startT = 0;
+          }
+        } else {
+          // If no season/episode in URL, resume from last saved season/episode and time
+          startS = saved.season || 1;
+          startE = saved.episode || 1;
+          startT = saved.currentTime || 0;
+          if (saved.progress >= 95) startT = 0;
+          
+          router.replace(`/watch?id=${movieId}&type=tv&s=${startS}&e=${startE}`, { scroll: false });
+        }
+      } else {
+        // Movie: resume time
+        startT = saved.currentTime || 0;
+        if (saved.progress >= 95) startT = 0;
+      }
+    }
+
+    setSeason(startS);
+    setEpisode(startE);
+    setStartTime(Math.floor(startT));
+    setIsInitialized(true);
+  }, [
+    contentLoading,
+    progressQueryLoading,
+    isAuthenticated,
+    progressQueryData,
+    movieId,
+    mediaType,
+    urlSeason,
+    urlEpisode,
+    isInitialized,
+    router
+  ]);
+
+  // Save progress helper
+  const saveProgress = useCallback((playbackState) => {
+    if (!isAuthenticatedRef.current || !movieId || !contentRef.current) return;
+
+    const progress = playbackState?.progress || 0;
+    const currentTime = playbackState?.currentTime || 0;
+    const duration = playbackState?.duration || 0;
+
     const currentEp = mediaType === 'tv'
-      ? seasonData?.episodes?.find((ep) => ep.episodeNumber === episode)
+      ? seasonDataRef.current?.episodes?.find((ep) => ep.episodeNumber === episodeRef.current)
       : null;
-    return {
-      title: content?.title || content?.name,
-      posterPath: content?.posterPath,
-      backdropPath: content?.backdropPath,
+
+    const payload = {
+      title: contentRef.current?.title || contentRef.current?.name,
+      posterPath: contentRef.current?.posterPath,
+      backdropPath: contentRef.current?.backdropPath,
       mediaType,
-      progress: overrideProgress ?? 5,
-      currentTime: 0,
-      duration: mediaType === 'tv'
-        ? (currentEp?.runtime || 24) * 60
-        : (content?.runtime || 120) * 60,
+      progress: Math.min(100, Math.max(0, progress)),
+      currentTime: Math.floor(currentTime),
+      duration: Math.floor(duration),
       ...(mediaType === 'tv' && {
-        season,
-        episode,
+        season: seasonRef.current,
+        episode: episodeRef.current,
         episodeTitle: currentEp?.name || null,
       }),
     };
-  }, [content, mediaType, season, episode, seasonData]);
 
-  // Mark started when content is ready
-  useEffect(() => {
-    if (isAuthenticated && movieId && content && !progressSavedRef.current) {
-      progressSavedRef.current = true;
-      const payload = buildProgressPayload(5);
-      latestProgressPayloadRef.current = { movieId: Number(movieId), data: payload };
-      updateProgressMutation.mutate({ movieId: Number(movieId), data: payload });
-    }
-  }, [isAuthenticated, movieId, content, buildProgressPayload]);
+    libraryApi.updateProgress(Number(movieId), payload)
+      .then(() => {
+        // Invalidate queries so that homepage / rows stay updated
+        queryClient.invalidateQueries({ queryKey: ['library', 'continueWatching'] });
+      })
+      .catch((err) => console.error('Failed to save progress:', err));
+  }, [movieId, mediaType, queryClient]);
 
-  // Keep latestProgressPayloadRef fresh as episode/season changes
-  useEffect(() => {
-    if (isAuthenticated && movieId && content) {
-      latestProgressPayloadRef.current = {
-        movieId: Number(movieId),
-        data: buildProgressPayload(5),
-      };
-    }
-  }, [season, episode, isAuthenticated, movieId, content, buildProgressPayload]);
-
-  // Mark complete when ended event fires
+  // Iframe player event listener
   useEffect(() => {
     const handleMessage = (event) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data && (data.event === 'ended' || data.type === 'ended' || data.action === 'ended')) {
-          if (isAuthenticated && movieId && content) {
-            updateProgressMutation.mutate({
-              movieId: Number(movieId),
-              data: buildProgressPayload(100),
-            });
-          }
-        }
-      } catch {}
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [isAuthenticated, movieId, content, buildProgressPayload]);
+      const parsed = parsePlayerMessage(event);
+      if (!parsed) return;
 
-  // Fire-and-forget save on page unmount
-  useEffect(() => {
-    return () => {
-      const payload = latestProgressPayloadRef.current;
-      // Use ref to avoid stale closure of isAuthenticated
-      if (payload && isAuthenticatedRef.current) {
-        // Use sendBeacon if available for better reliability on unmount, fallback to axios
-        try {
-          // Fire-and-forget API call
-          libraryApi.updateProgress(payload.movieId, payload.data).catch(() => {});
-        } catch (e) {}
+      const { eventName, data: eventData } = parsed;
+
+      if (eventName === 'timeupdate') {
+        const currentTime = Number(eventData.currentTime || 0);
+        const duration = Number(eventData.duration || 0);
+        const progress = Number(eventData.progress || 0);
+
+        // Check if player reported a different season/episode (e.g. autoplay advanced episode)
+        const reportedSeason = eventData.season ? Number(eventData.season) : null;
+        const reportedEpisode = eventData.episode ? Number(eventData.episode) : null;
+
+        if (mediaType === 'tv' && reportedSeason && reportedEpisode &&
+            (reportedSeason !== seasonRef.current || reportedEpisode !== episodeRef.current)) {
+          
+          setSeason(reportedSeason);
+          setEpisode(reportedEpisode);
+          setStartTime(0);
+          lastSavedTimeRef.current = 0;
+          currentPlaybackStateRef.current = { currentTime: 0, duration: 0, progress: 0 };
+          
+          router.replace(`/watch?id=${movieId}&type=tv&s=${reportedSeason}&e=${reportedEpisode}`, { scroll: false });
+          return;
+        }
+
+        currentPlaybackStateRef.current = { currentTime, duration, progress };
+
+        // Save progress periodically (every 15 seconds)
+        if (Math.abs(currentTime - lastSavedTimeRef.current) >= 15) {
+          lastSavedTimeRef.current = currentTime;
+          saveProgress({ currentTime, duration, progress });
+        }
+      } else if (eventName === 'pause' || eventName === 'paused') {
+        saveProgress(currentPlaybackStateRef.current);
+      } else if (eventName === 'ended') {
+        saveProgress({
+          ...currentPlaybackStateRef.current,
+          progress: 100
+        });
       }
     };
-  }, []); // intentionally empty — captured via ref
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [movieId, mediaType, router, saveProgress]);
+
+  // Unmount effect (keepalive send)
+  useEffect(() => {
+    return () => {
+      const playbackState = currentPlaybackStateRef.current;
+      // Only save if some watch progress has actually occurred
+      if (isAuthenticatedRef.current && movieId && (playbackState.currentTime > 0 || playbackState.progress > 0)) {
+        const currentEp = mediaType === 'tv'
+          ? seasonDataRef.current?.episodes?.find((ep) => ep.episodeNumber === episodeRef.current)
+          : null;
+
+        const payload = {
+          title: contentRef.current?.title || contentRef.current?.name,
+          posterPath: contentRef.current?.posterPath,
+          backdropPath: contentRef.current?.backdropPath,
+          mediaType,
+          progress: Math.min(100, Math.max(0, playbackState.progress)),
+          currentTime: Math.floor(playbackState.currentTime),
+          duration: Math.floor(playbackState.duration),
+          ...(mediaType === 'tv' && {
+            season: seasonRef.current,
+            episode: episodeRef.current,
+            episodeTitle: currentEp?.name || null,
+          }),
+        };
+
+        const token = localStorage.getItem('token');
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+        const url = `${baseUrl}/library/progress/${movieId}`;
+
+        try {
+          fetch(url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(() => {});
+        } catch (e) {
+          console.error('Error during keepalive progress save:', e);
+        }
+      }
+    };
+  }, [movieId, mediaType]);
 
   const embedUrl = useMemo(() => {
-    if (!movieId) return '';
+    if (!isInitialized || !movieId) return '';
+    const startParam = startTime > 0 ? `&start=${startTime}` : '';
     if (mediaType === 'tv') {
-      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=e50914&nextEpisode=true&episodeSelector=true&autoplay=1`;
+      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=e50914&nextEpisode=true&episodeSelector=true&autoplay=1${startParam}`;
     }
-    return `https://www.vidking.net/embed/movie/${movieId}?color=e50914&autoplay=1`;
-  }, [movieId, mediaType, season, episode]);
+    return `https://www.vidking.net/embed/movie/${movieId}?color=e50914&autoplay=1${startParam}`;
+  }, [movieId, mediaType, season, episode, startTime, isInitialized]);
 
   const handleBack = useCallback(() => {
     if (window.history.length > 1) router.back();
@@ -409,18 +555,20 @@ function WatchContent() {
   const handleSeasonChange = useCallback((newSeason) => {
     setSeason(newSeason);
     setEpisode(1);
+    setStartTime(0);
     setIsIframeLoading(true);
     setIsPaused(false);
-    progressSavedRef.current = false;
+    lastSavedTimeRef.current = 0;
     router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${newSeason}&e=1`, { scroll: false });
   }, [movieId, mediaType, router, setIsPaused]);
 
   const handleEpisodeChange = useCallback((newEpisode) => {
     setEpisode(newEpisode);
+    setStartTime(0);
     setIsIframeLoading(true);
     setIsPaused(false);
     setIsSidebarOpen(false);
-    progressSavedRef.current = false;
+    lastSavedTimeRef.current = 0;
     router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${season}&e=${newEpisode}`, { scroll: false });
   }, [movieId, mediaType, season, router, setIsPaused]);
 
@@ -451,12 +599,9 @@ function WatchContent() {
   const title = content?.title || content?.name || 'Loading...';
   const realSeasons = content?.seasons || [];
 
-
-
-  // showOverlay: drives dim + title card + gradients (paused state)
   const showOverlay = showTitleCard || isSidebarOpen;
-  // showControls: drives back button + bottom bar (hover or paused)
   const showCursor = showOverlay || showControls;
+  const isPageLoading = !isInitialized || contentLoading || (isAuthenticated && progressQueryLoading) || isIframeLoading;
 
   return (
     <div
@@ -465,23 +610,25 @@ function WatchContent() {
     >
       {/* ─── Video Player ─── */}
       <div className="watch-player-wrapper">
-        {(contentLoading || isIframeLoading) && <LoadingSpinner />}
+        {isPageLoading && <LoadingSpinner />}
         <motion.div
           className="watch-player"
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: isIframeLoading ? 0 : 1, scale: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <iframe
-            ref={iframeRef}
-            key={embedUrl}
-            src={embedUrl}
-            title={title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-            className="watch-iframe"
-            onLoad={handleIframeLoad}
-          />
+          {isInitialized && (
+            <iframe
+              ref={iframeRef}
+              key={embedUrl}
+              src={embedUrl}
+              title={title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              className="watch-iframe"
+              onLoad={handleIframeLoad}
+            />
+          )}
         </motion.div>
       </div>
 
@@ -520,8 +667,6 @@ function WatchContent() {
           </motion.div>
         )}
       </AnimatePresence>
-
-
 
       {/* ─── Title Card (paused + 2.5s idle) ─── */}
       <AnimatePresence>

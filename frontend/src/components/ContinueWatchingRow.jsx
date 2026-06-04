@@ -32,6 +32,22 @@ function getTimeAgo(dateString) {
   return null;
 }
 
+function getProgressTimeText(item) {
+  if (item.currentTime && item.duration) {
+    const remaining = item.duration - item.currentTime;
+    const remainingMinutes = Math.ceil(remaining / 60);
+    if (remainingMinutes <= 0) return 'Finished';
+    
+    if (remainingMinutes < 60) {
+      return `${remainingMinutes}m left`;
+    }
+    const hours = Math.floor(remainingMinutes / 60);
+    const mins = remainingMinutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m left` : `${hours}h left`;
+  }
+  return item.progress ? `${Math.round(item.progress)}% watched` : '';
+}
+
 function ContinueCard({ item, onResume, onRemove }) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -126,29 +142,26 @@ function ContinueCard({ item, onResume, onRemove }) {
       </div>
 
       {/* Info below image */}
-      <div className="mt-2 px-0.5">
+      <div className="mt-2 px-0.5 flex flex-col gap-0.5">
         <h4 className="text-white/90 text-sm font-semibold truncate leading-snug">
           {item.title}
         </h4>
-        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-          {episodeLabel && (
-            <span className="text-white/55 text-xs font-medium flex-shrink-0">
-              {episodeLabel}
+        <div className="flex items-center gap-1.5 text-xs text-white/50 min-w-0">
+          {isTV && item.season && (
+            <span className="font-semibold text-white/70 flex-shrink-0">
+              S{item.season}:E{item.episode}
             </span>
           )}
-          {episodeLabel && item.episodeTitle && (
-            <span className="text-white/30 text-xs">·</span>
+          {isTV && item.season && item.episodeTitle && (
+            <span className="text-white/30">·</span>
           )}
-          {item.episodeTitle ? (
-            <span className="text-white/40 text-xs truncate">{item.episodeTitle}</span>
-          ) : (
-            timeAgo && !episodeLabel && (
-              <span className="text-white/40 text-xs">{timeAgo}</span>
-            )
+          {isTV && item.episodeTitle && (
+            <span className="truncate text-white/40">{item.episodeTitle}</span>
           )}
-          {episodeLabel && !item.episodeTitle && timeAgo && (
-            <span className="text-white/30 text-xs flex-shrink-0">{timeAgo}</span>
-          )}
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-white/35 mt-0.5">
+          <span>{getProgressTimeText(item)}</span>
+          {timeAgo && <span>{timeAgo}</span>}
         </div>
       </div>
     </motion.div>

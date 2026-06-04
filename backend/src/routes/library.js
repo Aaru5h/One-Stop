@@ -144,6 +144,32 @@ router.get('/continue-watching', async (req, res) => {
   }
 });
 
+// @route   GET /api/library/progress/:movieId
+// @desc    Get watching progress for a specific movie/show
+// @access  Private
+router.get('/progress/:movieId', async (req, res) => {
+  try {
+    const { movieId } = req.params;
+    const library = await Library.findOne({ userId: req.user._id });
+    
+    if (!library) {
+      return res.json({ success: true, progress: null });
+    }
+
+    const progress = library.continueWatching.find(
+      item => item.movieId === parseInt(movieId)
+    );
+
+    res.json({
+      success: true,
+      progress: progress || null
+    });
+  } catch (error) {
+    console.error('Get progress error:', error);
+    res.status(500).json({ error: 'Failed to fetch progress' });
+  }
+});
+
 // @route   PUT /api/library/progress/:movieId
 // @desc    Update watching progress
 // @access  Private

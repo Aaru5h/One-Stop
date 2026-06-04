@@ -133,6 +133,9 @@ export const libraryApi = {
   getContinueWatching: () => 
     api.get('/library/continue-watching'),
   
+  getProgress: (movieId) =>
+    api.get(`/library/progress/${movieId}`),
+  
   updateProgress: (movieId, data) => 
     api.put(`/library/progress/${movieId}`, data),
   

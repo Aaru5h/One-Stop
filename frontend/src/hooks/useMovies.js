@@ -17,6 +17,7 @@ export const queryKeys = {
   search: (query, params) => ['search', query, params],
   watchlist: () => ['library', 'watchlist'],
   continueWatching: () => ['library', 'continueWatching'],
+  progress: (movieId) => ['library', 'progress', movieId],
   seasonDetails: (id, seasonNumber) => ['tv', id, 'season', seasonNumber],
 };
 
@@ -210,6 +211,15 @@ export function useContinueWatching() {
     queryKey: queryKeys.continueWatching(),
     queryFn: () => libraryApi.getContinueWatching().then(res => res.data),
     staleTime: 60 * 1000,
+  });
+}
+
+export function useProgress(movieId) {
+  return useQuery({
+    queryKey: queryKeys.progress(movieId),
+    queryFn: () => libraryApi.getProgress(movieId).then(res => res.data),
+    enabled: !!movieId,
+    staleTime: 0, // Always fetch fresh progress when watch page is loaded
   });
 }
 
