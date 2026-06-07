@@ -518,8 +518,7 @@ function WatchContent() {
         };
 
         const token = localStorage.getItem('token');
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-        const url = `${baseUrl}/library/progress/${movieId}`;
+        const url = `/api/library/progress/${movieId}`;
 
         try {
           fetch(url, {
