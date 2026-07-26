@@ -6,21 +6,26 @@
    ======================================== */
 
 :root {
-  /* Deep Obsidian Background */
-  --background: #050505;
-  --foreground: #f5f5f7;
+  /* Pure Black Background (arrowTV) */
+  --background: #000000;
+  --foreground: #ffffff;
 
-  /* Glass Material Tokens */
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-bg-hover: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-border-hover: rgba(255, 255, 255, 0.15);
-  --glass-blur: 64px;
+  /* Surface Tokens — subtle, minimal */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hover: rgba(255, 255, 255, 0.18);
+  --glass-blur: 12px;
 
-  /* Accent Colors */
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  /* Neutral accent — arrowTV uses white on white/tint */
+  --accent-primary: #ffffff;
+  --accent-secondary: rgba(255, 255, 255, 0.7);
+  --accent-gradient: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.08) 100%);
+
+  /* iOS-tile tokens for tab bar */
+  --tile-bar-bg: #1c1c1e;
+  --tile-inactive: #2a2a2c;
+  --tile-active: #3d3d3f;
 
   /* Text Colors */
   --text-primary: rgba(255, 255, 255, 0.95);
@@ -30,8 +35,8 @@
 
   /* Shadows */
   --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-elevated: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 60px rgba(99, 102, 241, 0.15);
+  --shadow-elevated: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 8px 32px rgba(0, 0, 0, 0.9);
 
   /* Spacing - Breathable UI */
   --space-xs: 0.5rem;
@@ -60,8 +65,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-nunito);
 }
 
 /* Base Styles */
@@ -80,7 +84,7 @@ body {
 
 /* Selection */
 ::selection {
-  background: rgba(99, 102, 241, 0.4);
+  background: rgba(255, 255, 255, 0.25);
   color: white;
 }
 
@@ -408,7 +412,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 80px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 80px rgba(255, 255, 255, 0.12);
   }
 }
 
@@ -471,60 +475,6 @@ body {
   background: radial-gradient(ellipse at center,
       transparent 0%,
       rgba(5, 5, 5, 0.5) 100%);
-}
-
-/* ========================================
-   Mouse Follow Effect
-   ======================================== */
-
-.mouse-follow-container {
-  position: relative;
-  overflow: hidden;
-}
-
-.mouse-follow-gradient {
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle,
-      rgba(99, 102, 241, 0.15) 0%,
-      transparent 70%);
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  transition: opacity 0.3s ease;
-  opacity: 0;
-}
-
-.mouse-follow-container:hover .mouse-follow-gradient {
-  opacity: 1;
-}
-
-/* ========================================
-   Mobile Tab Bar
-   ======================================== */
-
-.mobile-tab-bar {
-  position: fixed;
-  bottom: var(--space-md);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: var(--space-xs);
-  padding: var(--space-xs);
-  border-radius: var(--radius-2xl);
-  z-index: 100;
-  transition: all var(--transition-base);
-}
-
-.mobile-tab-bar.collapsed {
-  padding: var(--space-xs) var(--space-sm);
-}
-
-@media (min-width: 768px) {
-  .mobile-tab-bar {
-    display: none;
-  }
 }
 
 /* ========================================
