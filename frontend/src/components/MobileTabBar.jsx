@@ -47,6 +47,9 @@ const isActive = (pathname, href) => href === '/' ? pathname === '/' : pathname.
 export default function MobileTabBar() {
     const pathname = usePathname() || '/';
 
+    // Would sit on top of the player's own controls.
+    if (pathname === '/watch') return null;
+
     return (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-[120] flex justify-center pb-2 px-4 pointer-events-none">
             <div
