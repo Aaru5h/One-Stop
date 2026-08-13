@@ -40,35 +40,25 @@
 ### Installation
 
 1.  **Clone the repository**
-2.  **Install dependencies for both frontend and backend:**
+2.  **Install dependencies:**
     ```bash
-    npm install
     cd frontend && npm install
-    cd ../backend && npm install
     ```
 3.  **Configure Environment Variables:**
-    *   In the `backend` directory, create a `.env` file based on `.env.example` and add your `TMDB_API_KEY`.
-    *   In the `frontend` directory, ensure the API URL points to your local backend during development (usually `http://localhost:5000`).
+    *   In the `frontend` directory, create a `.env.local` based on `.env.example` and fill in `MONGODB_URI`, `JWT_SECRET`, and `TMDB_API_KEY`.
 
 ### Running Locally
 
-You'll need to run both the frontend and backend servers simultaneously.
+The API lives in `frontend/src/app/api` as Next.js route handlers, so there is only one service to run.
 
-1.  **Start the Backend API:**
-    ```bash
-    cd backend
-    npm run dev
-    ```
-    *(Runs on port 5000 by default)*
+```bash
+cd frontend
+npm run dev
+```
 
-2.  **Start the Frontend App:**
-    ```bash
-    cd frontend
-    npm run dev
-    ```
-    *(Runs on port 3000 by default)*
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-3.  Open [http://localhost:3000](http://localhost:3000) in your browser.
+> The legacy Express server in `backend/` is kept for reference only and is no longer used or deployed.
 
 ## 🤝 Contributing
 
