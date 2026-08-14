@@ -3,8 +3,13 @@ import dbConnect from '@/lib/db/connect';
 import User from '@/lib/models/User';
 import Library from '@/lib/models/Library';
 import { generateToken } from '@/lib/middleware/auth';
+import { rateLimitGuard } from '@/lib/middleware/rateLimit';
 
 export async function POST(request) {
+  // Rate limit: 5 registrations per minute per IP
+  const rateLimitResponse = rateLimitGuard(request, { limit: 5, windowMs: 60 * 1000, prefix: 'auth_register' });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     await dbConnect();
     const { email, password, name } = await request.json();

@@ -5,6 +5,7 @@ import { movieApi, searchApi, libraryApi } from '@/lib/api';
 
 // Query keys
 export const queryKeys = {
+  homeFeed: () => ['home', 'feed'],
   trending: (params) => ['movies', 'trending', params],
   popular: (params) => ['movies', 'popular', params],
   topRated: (params) => ['movies', 'topRated', params],
@@ -20,6 +21,15 @@ export const queryKeys = {
   progress: (movieId) => ['library', 'progress', movieId],
   seasonDetails: (id, seasonNumber) => ['tv', id, 'season', seasonNumber],
 };
+
+// BFF Composite Home Feed hook (loads all initial rows in 1 network call)
+export function useHomeFeed() {
+  return useQuery({
+    queryKey: queryKeys.homeFeed(),
+    queryFn: () => movieApi.getHomeFeed().then(res => res.data),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
 
 // Trending movies hook
 export function useTrending(params = {}) {
@@ -188,8 +198,34 @@ export function useAddToWatchlist() {
   
   return useMutation({
     mutationFn: ({ movieId, data }) => libraryApi.addToWatchlist(movieId, data),
-    onSuccess: () => {
+    onMutate: async ({ movieId, data }) => {
+      // Cancel outgoing queries to avoid overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: queryKeys.watchlist() });
+
+      // Snapshot previous value
+      const previousWatchlist = queryClient.getQueryData(queryKeys.watchlist());
+
+      // Optimistically update watchlist cache
+      queryClient.setQueryData(queryKeys.watchlist(), (old) => {
+        const currentList = old?.watchlist || [];
+        const exists = currentList.some(item => String(item.movieId) === String(movieId));
+        if (exists) return old;
+        return {
+          ...old,
+          watchlist: [{ movieId, ...data, addedAt: new Date().toISOString() }, ...currentList]
+        };
+      });
+
+      return { previousWatchlist };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousWatchlist !== undefined) {
+        queryClient.setQueryData(queryKeys.watchlist(), context.previousWatchlist);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlist() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed() });
     }
   });
 }
@@ -199,8 +235,29 @@ export function useRemoveFromWatchlist() {
   
   return useMutation({
     mutationFn: (movieId) => libraryApi.removeFromWatchlist(movieId),
-    onSuccess: () => {
+    onMutate: async (movieId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.watchlist() });
+
+      const previousWatchlist = queryClient.getQueryData(queryKeys.watchlist());
+
+      queryClient.setQueryData(queryKeys.watchlist(), (old) => {
+        if (!old?.watchlist) return old;
+        return {
+          ...old,
+          watchlist: old.watchlist.filter(item => String(item.movieId) !== String(movieId))
+        };
+      });
+
+      return { previousWatchlist };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousWatchlist !== undefined) {
+        queryClient.setQueryData(queryKeys.watchlist(), context.previousWatchlist);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlist() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.homeFeed() });
     }
   });
 }
@@ -228,7 +285,31 @@ export function useUpdateProgress() {
 
   return useMutation({
     mutationFn: ({ movieId, data }) => libraryApi.updateProgress(movieId, data),
-    onSuccess: () => {
+    onMutate: async ({ movieId, data }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.continueWatching() });
+      const previousCW = queryClient.getQueryData(queryKeys.continueWatching());
+
+      queryClient.setQueryData(queryKeys.continueWatching(), (old) => {
+        const currentList = old?.continueWatching || [];
+        const index = currentList.findIndex(item => String(item.movieId) === String(movieId));
+        let updatedList;
+        if (index > -1) {
+          updatedList = [...currentList];
+          updatedList[index] = { ...updatedList[index], ...data, lastWatched: new Date().toISOString() };
+        } else {
+          updatedList = [{ movieId, ...data, lastWatched: new Date().toISOString() }, ...currentList];
+        }
+        return { ...old, continueWatching: updatedList };
+      });
+
+      return { previousCW };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousCW !== undefined) {
+        queryClient.setQueryData(queryKeys.continueWatching(), context.previousCW);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.continueWatching() });
     }
   });
@@ -239,7 +320,26 @@ export function useRemoveFromContinueWatching() {
 
   return useMutation({
     mutationFn: (movieId) => libraryApi.removeFromContinueWatching(movieId),
-    onSuccess: () => {
+    onMutate: async (movieId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.continueWatching() });
+      const previousCW = queryClient.getQueryData(queryKeys.continueWatching());
+
+      queryClient.setQueryData(queryKeys.continueWatching(), (old) => {
+        if (!old?.continueWatching) return old;
+        return {
+          ...old,
+          continueWatching: old.continueWatching.filter(item => String(item.movieId) !== String(movieId))
+        };
+      });
+
+      return { previousCW };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousCW !== undefined) {
+        queryClient.setQueryData(queryKeys.continueWatching(), context.previousCW);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.continueWatching() });
     }
   });

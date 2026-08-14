@@ -2,8 +2,13 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db/connect';
 import User from '@/lib/models/User';
 import { generateToken } from '@/lib/middleware/auth';
+import { rateLimitGuard } from '@/lib/middleware/rateLimit';
 
 export async function POST(request) {
+  // Rate limit: 10 attempts per minute to prevent brute-force
+  const rateLimitResponse = rateLimitGuard(request, { limit: 10, windowMs: 60 * 1000, prefix: 'auth_login' });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     await dbConnect();
     const { email, password } = await request.json();

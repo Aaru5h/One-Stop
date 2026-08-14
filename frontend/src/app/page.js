@@ -7,7 +7,7 @@ import Hero from '@/components/Hero';
 import MovieRow, { MovieRowSkeleton } from '@/components/MovieRow';
 import MovieModal from '@/components/MovieModal';
 import ContinueWatchingRow from '@/components/ContinueWatchingRow';
-import { useTrending, usePopular, useTopRated, useNowPlaying, useMovieDetails, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
+import { useHomeFeed, useMovieDetails, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
 
 // Genre configurations with IDs from TMDB
 const GENRE_ROWS = [
@@ -26,11 +26,18 @@ export default function HomePage() {
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch movie data
-  const { data: trendingData, isLoading: trendingLoading } = useTrending({ mediaType: 'movie' });
-  const { data: popularData, isLoading: popularLoading } = usePopular({ mediaType: 'movie' });
-  const { data: topRatedData, isLoading: topRatedLoading } = useTopRated({ mediaType: 'movie' });
-  const { data: nowPlayingData, isLoading: nowPlayingLoading } = useNowPlaying({ mediaType: 'movie' });
+  // Fetch composite home feed in a single high-performance BFF query
+  const { data: homeFeed, isLoading: homeLoading } = useHomeFeed();
+
+  const trendingData = homeFeed?.trending;
+  const popularData = homeFeed?.popular;
+  const topRatedData = homeFeed?.topRated;
+  const nowPlayingData = homeFeed?.nowPlaying;
+
+  const trendingLoading = homeLoading;
+  const popularLoading = homeLoading;
+  const topRatedLoading = homeLoading;
+  const nowPlayingLoading = homeLoading;
 
   // Fetch movie details when modal is opened
   const { data: movieDetails } = useMovieDetails(
@@ -44,17 +51,18 @@ export default function HomePage() {
   const removeFromWatchlist = useRemoveFromWatchlist();
 
   const watchlistIds = useMemo(() => {
-    const watchlist = watchlistData?.watchlist || [];
+    // Prefer user's active watchlist, fallback to home feed snapshot
+    const watchlist = watchlistData?.watchlist || homeFeed?.watchlist || [];
     return new Set(watchlist.map(item => item.movieId));
-  }, [watchlistData]);
+  }, [watchlistData, homeFeed]);
 
   const isSelectedMovieInWatchlist = useMemo(() => {
     if (!selectedMovie) return false;
     return watchlistIds.has(selectedMovie.id);
   }, [selectedMovie, watchlistIds]);
 
-  // Hero movie (first trending)
-  const heroMovie = trendingData?.results?.[0];
+  // Hero movie (first trending or popular)
+  const heroMovie = homeFeed?.hero || trendingData?.results?.[0];
 
   // Handlers
   const handleMovieClick = useCallback((movie) => {

@@ -3,6 +3,7 @@ import { getSessionUser } from '@/lib/middleware/auth';
 import dbConnect from '@/lib/db/connect';
 import Library from '@/lib/models/Library';
 import tmdbService from '@/lib/services/tmdb';
+import { rateLimitGuard } from '@/lib/middleware/rateLimit';
 import Fuse from 'fuse.js';
 
 // Cache for fuzzy search
@@ -46,6 +47,10 @@ const buildSearchCache = async () => {
 };
 
 export async function GET(request) {
+  // Rate limit: 60 search requests per minute per IP
+  const rateLimitResponse = rateLimitGuard(request, { limit: 60, windowMs: 60 * 1000, prefix: 'search' });
+  if (rateLimitResponse) return rateLimitResponse;
+
   try {
     await dbConnect();
     const user = await getSessionUser(request);

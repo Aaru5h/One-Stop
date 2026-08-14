@@ -1,4 +1,5 @@
 import axios from 'axios';
+import cacheManager from '@/lib/cache/cacheManager';
 
 // Create axios instance for TMDB API
 const tmdbApi = axios.create({
@@ -130,201 +131,248 @@ const transformMovieDetails = (movie, credits = null, userLibrary = null) => {
   return transformed;
 };
 
-// API Methods
+// API Methods with Cache-Aside & Circuit Breaker
 export const tmdbService = {
   // Get trending movies/shows
   async getTrending(mediaType = 'movie', timeWindow = 'week', page = 1) {
-    const response = await tmdbApi.get(`/trending/${mediaType}/${timeWindow}`, {
-      params: { page }
-    });
-    const explicitType = mediaType === 'all' ? null : mediaType;
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, explicitType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:trending:${mediaType}:${timeWindow}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/trending/${mediaType}/${timeWindow}`, {
+        params: { page }
+      });
+      const explicitType = mediaType === 'all' ? null : mediaType;
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, explicitType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 30); // 30 mins TTL
   },
 
   // Get popular movies/shows
   async getPopular(mediaType = 'movie', page = 1) {
-    const response = await tmdbApi.get(`/${mediaType}/popular`, {
-      params: { page }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:popular:${mediaType}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/${mediaType}/popular`, {
+        params: { page }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 60); // 1 hour TTL
   },
 
   // Get top rated
   async getTopRated(mediaType = 'movie', page = 1) {
-    const response = await tmdbApi.get(`/${mediaType}/top_rated`, {
-      params: { page }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:top_rated:${mediaType}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/${mediaType}/top_rated`, {
+        params: { page }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 60); // 1 hour TTL
   },
 
   // Get now playing (movies) or on the air (TV)
   async getNowPlaying(mediaType = 'movie', page = 1) {
     const endpoint = mediaType === 'movie' ? '/movie/now_playing' : '/tv/on_the_air';
-    const response = await tmdbApi.get(endpoint, {
-      params: { page }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:now_playing:${mediaType}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(endpoint, {
+        params: { page }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 60); // 1 hour TTL
   },
 
   // Get movies by genre
   async getByGenre(genreId, mediaType = 'movie', page = 1) {
-    const response = await tmdbApi.get(`/discover/${mediaType}`, {
-      params: { 
-        with_genres: genreId,
-        page,
-        sort_by: 'popularity.desc'
-      }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:genre:${genreId}:${mediaType}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/discover/${mediaType}`, {
+        params: { 
+          with_genres: genreId,
+          page,
+          sort_by: 'popularity.desc'
+        }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 60); // 1 hour TTL
   },
 
   // Get movie/show details
   async getDetails(id, mediaType = 'movie', userLibrary = null) {
-    const [detailsResponse, creditsResponse] = await Promise.all([
-      tmdbApi.get(`/${mediaType}/${id}`),
-      tmdbApi.get(`/${mediaType}/${id}/credits`)
-    ]);
-    
-    return transformMovieDetails(
-      detailsResponse.data, 
-      creditsResponse.data,
-      userLibrary
-    );
+    const cacheKey = `tmdb:details:${mediaType}:${id}`;
+    const baseDetails = await cacheManager.getOrSet(cacheKey, async () => {
+      const [detailsResponse, creditsResponse] = await Promise.all([
+        tmdbApi.get(`/${mediaType}/${id}`),
+        tmdbApi.get(`/${mediaType}/${id}/credits`)
+      ]);
+      
+      return transformMovieDetails(
+        detailsResponse.data, 
+        creditsResponse.data,
+        null
+      );
+    }, 1000 * 60 * 120); // 2 hours TTL
+
+    // If user library is provided, enrich dynamically without dirtying static cache
+    if (userLibrary) {
+      return {
+        ...baseDetails,
+        isInWatchlist: userLibrary.isInWatchlist(baseDetails.id),
+        watchProgress: userLibrary.getProgress(baseDetails.id)
+      };
+    }
+
+    return baseDetails;
   },
 
   // Search movies and shows
   async search(query, page = 1, mediaType = 'multi') {
-    const response = await tmdbApi.get(`/search/${mediaType}`, {
-      params: { query, page }
-    });
-    
-    const filtered = mediaType === 'multi' 
-      ? response.data.results.filter(item => item.media_type !== 'person')
-      : response.data.results;
+    const cacheKey = `tmdb:search:${mediaType}:${query.toLowerCase().trim()}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/search/${mediaType}`, {
+        params: { query, page }
+      });
+      
+      const filtered = mediaType === 'multi' 
+        ? response.data.results.filter(item => item.media_type !== 'person')
+        : response.data.results;
 
-    return {
-      results: filtered.map(movie => transformMovie(movie)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+      return {
+        results: filtered.map(movie => transformMovie(movie)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 5); // 5 mins TTL
   },
 
   // Get genre list
   async getGenres(mediaType = 'movie') {
-    const response = await tmdbApi.get(`/genre/${mediaType}/list`);
-    return response.data.genres;
+    const cacheKey = `tmdb:genres:${mediaType}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/genre/${mediaType}/list`);
+      return response.data.genres;
+    }, 1000 * 60 * 60 * 24); // 24 hours TTL
   },
 
   // Get similar movies
   async getSimilar(id, mediaType = 'movie', page = 1) {
-    const response = await tmdbApi.get(`/${mediaType}/${id}/similar`, {
-      params: { page }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:similar:${mediaType}:${id}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/${mediaType}/${id}/similar`, {
+        params: { page }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 120); // 2 hours TTL
   },
 
   // Get recommendations
   async getRecommendations(id, mediaType = 'movie', page = 1) {
-    const response = await tmdbApi.get(`/${mediaType}/${id}/recommendations`, {
-      params: { page }
-    });
-    return {
-      results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
-      page: response.data.page,
-      totalPages: response.data.total_pages,
-      totalResults: response.data.total_results
-    };
+    const cacheKey = `tmdb:recommendations:${mediaType}:${id}:${page}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/${mediaType}/${id}/recommendations`, {
+        params: { page }
+      });
+      return {
+        results: response.data.results.map(movie => transformMovie(movie, null, mediaType)),
+        page: response.data.page,
+        totalPages: response.data.total_pages,
+        totalResults: response.data.total_results
+      };
+    }, 1000 * 60 * 120); // 2 hours TTL
   },
 
   // Get videos (trailers, clips, etc.)
   async getVideos(id, mediaType = 'movie') {
-    const response = await tmdbApi.get(`/${mediaType}/${id}/videos`);
-    
-    const videos = response.data.results || [];
-    
-    const sorted = videos
-      .filter(v => v.site === 'YouTube')
-      .sort((a, b) => {
-        const aScore = (a.official ? 10 : 0) + 
-                       (a.type === 'Trailer' ? 5 : 0) + 
-                       (a.type === 'Teaser' ? 3 : 0);
-        const bScore = (b.official ? 10 : 0) + 
-                       (b.type === 'Trailer' ? 5 : 0) + 
-                       (b.type === 'Teaser' ? 3 : 0);
-        return bScore - aScore;
-      });
+    const cacheKey = `tmdb:videos:${mediaType}:${id}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/${mediaType}/${id}/videos`);
+      
+      const videos = response.data.results || [];
+      
+      const sorted = videos
+        .filter(v => v.site === 'YouTube')
+        .sort((a, b) => {
+          const aScore = (a.official ? 10 : 0) + 
+                         (a.type === 'Trailer' ? 5 : 0) + 
+                         (a.type === 'Teaser' ? 3 : 0);
+          const bScore = (b.official ? 10 : 0) + 
+                         (b.type === 'Trailer' ? 5 : 0) + 
+                         (b.type === 'Teaser' ? 3 : 0);
+          return bScore - aScore;
+        });
 
-    return {
-      results: sorted.map(video => ({
-        id: video.id,
-        key: video.key,
-        name: video.name,
-        type: video.type,
-        official: video.official,
-        site: video.site,
-        size: video.size
-      }))
-    };
+      return {
+        results: sorted.map(video => ({
+          id: video.id,
+          key: video.key,
+          name: video.name,
+          type: video.type,
+          official: video.official,
+          site: video.site,
+          size: video.size
+        }))
+      };
+    }, 1000 * 60 * 120); // 2 hours TTL
   },
 
   // Get season details with full episode list
   async getSeasonDetails(tvId, seasonNumber) {
-    const response = await tmdbApi.get(`/tv/${tvId}/season/${seasonNumber}`);
-    const season = response.data;
+    const cacheKey = `tmdb:season:${tvId}:${seasonNumber}`;
+    return cacheManager.getOrSet(cacheKey, async () => {
+      const response = await tmdbApi.get(`/tv/${tvId}/season/${seasonNumber}`);
+      const season = response.data;
 
-    return {
-      id: season.id,
-      seasonNumber: season.season_number,
-      name: season.name,
-      overview: season.overview || '',
-      airDate: season.air_date,
-      posterPath: season.poster_path
-        ? `${IMAGE_BASE_URL}/${POSTER_SIZES.medium}${season.poster_path}`
-        : null,
-      episodes: (season.episodes || []).map(ep => ({
-        id: ep.id,
-        episodeNumber: ep.episode_number,
-        name: ep.name,
-        overview: ep.overview || '',
-        stillPath: ep.still_path
-          ? `${IMAGE_BASE_URL}/${BACKDROP_SIZES.small}${ep.still_path}`
+      return {
+        id: season.id,
+        seasonNumber: season.season_number,
+        name: season.name,
+        overview: season.overview || '',
+        airDate: season.air_date,
+        posterPath: season.poster_path
+          ? `${IMAGE_BASE_URL}/${POSTER_SIZES.medium}${season.poster_path}`
           : null,
-        airDate: ep.air_date,
-        runtime: ep.runtime,
-        voteAverage: ep.vote_average
-      }))
-    };
+        episodes: (season.episodes || []).map(ep => ({
+          id: ep.id,
+          episodeNumber: ep.episode_number,
+          name: ep.name,
+          overview: ep.overview || '',
+          stillPath: ep.still_path
+            ? `${IMAGE_BASE_URL}/${BACKDROP_SIZES.small}${ep.still_path}`
+            : null,
+          airDate: ep.air_date,
+          runtime: ep.runtime,
+          voteAverage: ep.vote_average
+        }))
+      };
+    }, 1000 * 60 * 120); // 2 hours TTL
   }
 };
 

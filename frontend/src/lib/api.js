@@ -41,6 +41,10 @@ api.interceptors.response.use(
 
 // API Methods
 export const movieApi = {
+  // BFF Composite Home Feed
+  getHomeFeed: () =>
+    api.get('/home'),
+
   // Trending content
   getTrending: (params = {}) => 
     api.get('/movies/trending', { params }),
