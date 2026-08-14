@@ -19,6 +19,12 @@ const PlusIcon = () => (
     </svg>
 );
 
+const CheckIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-green-400">
+        <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clipRule="evenodd" />
+    </svg>
+);
+
 const InfoIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
         <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 01.67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 11-.671-1.34l.041-.022zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
@@ -33,6 +39,7 @@ export default function Hero({
     onPlay,
     onAddToWatchlist,
     onMoreInfo,
+    isInWatchlist = false,
     isLoading = false
 }) {
     if (isLoading || !movie) {
@@ -141,10 +148,10 @@ export default function Hero({
                         <MagneticButton
                             variant="glass"
                             size="lg"
-                            icon={<PlusIcon />}
+                            icon={isInWatchlist ? <CheckIcon /> : <PlusIcon />}
                             onClick={() => onAddToWatchlist?.(movie)}
                         >
-                            Watchlist
+                            {isInWatchlist ? 'In Watchlist' : 'Watchlist'}
                         </MagneticButton>
 
                         <MagneticButton

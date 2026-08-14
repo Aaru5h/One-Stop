@@ -8,6 +8,7 @@ import MovieCard, { MovieCardSkeleton } from '@/components/MovieCard';
 import MovieModal from '@/components/MovieModal';
 import { GlassPanel } from '@/components/ui/GlassCard';
 import { useSearch, useMovieDetails, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
+import { useToast } from '@/contexts/ToastContext';
 import useInfiniteScroll from '@/hooks/useInfiniteScroll';
 
 // Debounce hook
@@ -70,17 +71,23 @@ export default function SearchPage() {
     return watchlistIds.has(selectedMovie.id);
   }, [selectedMovie, watchlistIds]);
 
+  const { showWatchlistAdded, showWatchlistRemoved, showError } = useToast();
+
   const handleToggleWatchlist = useCallback((movie) => {
     const movieId = movie.id;
     const isInWatchlist = watchlistIds.has(movieId);
+    const itemTitle = movie.title || movie.name;
 
     if (isInWatchlist) {
       removeFromWatchlist.mutate(movieId, {
+        onSuccess: () => {
+          showWatchlistRemoved(itemTitle, movie.posterPath);
+        },
         onError: (error) => {
           if (error.response?.status === 401) {
-            alert('Please log in to manage your watchlist');
+            showError('Please log in to manage your watchlist', itemTitle);
           } else {
-            alert('Failed to remove from watchlist');
+            showError('Failed to remove from watchlist', itemTitle);
           }
         }
       });
@@ -88,24 +95,24 @@ export default function SearchPage() {
       addToWatchlist.mutate({
         movieId,
         data: {
-          title: movie.title,
+          title: itemTitle,
           posterPath: movie.posterPath,
           mediaType: movie.mediaType || 'movie'
         }
       }, {
+        onSuccess: () => {
+          showWatchlistAdded(itemTitle, movie.posterPath);
+        },
         onError: (error) => {
           if (error.response?.status === 401) {
-            alert('Please log in to add to your watchlist');
+            showError('Please log in to add to your watchlist', itemTitle);
           } else {
-            alert('Failed to add to watchlist');
+            showError('Failed to add to watchlist', itemTitle);
           }
-        },
-        onSuccess: () => {
-          // Optional: show success feedback
         }
       });
     }
-  }, [watchlistIds, addToWatchlist, removeFromWatchlist]);
+  }, [watchlistIds, addToWatchlist, removeFromWatchlist, showWatchlistAdded, showWatchlistRemoved, showError]);
 
   const handleMovieClick = (movie) => {
     setSelectedMovie(movie);

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence } from 'framer-motion';
 import Hero from '@/components/Hero';
 import MovieRow, { MovieRowSkeleton } from '@/components/MovieRow';
 import MovieModal from '@/components/MovieModal';
-import { useTrending, usePopular, useTopRated, useMovieDetails, useMoviesByGenre } from '@/hooks/useMovies';
+import { useTrending, usePopular, useTopRated, useMovieDetails, useMoviesByGenre, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
+import { useToast } from '@/contexts/ToastContext';
 
 // Genre configurations for TV shows
 const TV_GENRES = [
@@ -24,6 +25,17 @@ export default function TVShowsPage() {
   const router = useRouter();
   const [selectedShow, setSelectedShow] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Watchlist functionality
+  const { data: watchlistData } = useWatchlist();
+  const addToWatchlist = useAddToWatchlist();
+  const removeFromWatchlist = useRemoveFromWatchlist();
+  const { showWatchlistAdded, showWatchlistRemoved, showError } = useToast();
+
+  const watchlistIds = useMemo(() => {
+    const watchlist = watchlistData?.watchlist || [];
+    return new Set(watchlist.map(item => item.movieId));
+  }, [watchlistData]);
 
   // Fetch TV show data
   const { data: trendingData, isLoading: trendingLoading } = useTrending({ mediaType: 'tv' });
@@ -64,8 +76,45 @@ export default function TVShowsPage() {
   }, [router]);
 
   const handleAddToWatchlist = useCallback((show) => {
-    console.log('Add to watchlist:', show.title || show.name);
-  }, []);
+    const movieId = show.id;
+    const isInWatchlist = watchlistIds.has(movieId);
+    const itemTitle = show.title || show.name;
+
+    if (isInWatchlist) {
+      removeFromWatchlist.mutate(movieId, {
+        onSuccess: () => {
+          showWatchlistRemoved(itemTitle, show.posterPath);
+        },
+        onError: (error) => {
+          if (error.response?.status === 401) {
+            showError('Please log in to manage your watchlist', itemTitle);
+          } else {
+            showError('Failed to remove from watchlist', itemTitle);
+          }
+        }
+      });
+    } else {
+      addToWatchlist.mutate({
+        movieId,
+        data: {
+          title: itemTitle,
+          posterPath: show.posterPath,
+          mediaType: 'tv'
+        }
+      }, {
+        onSuccess: () => {
+          showWatchlistAdded(itemTitle, show.posterPath);
+        },
+        onError: (error) => {
+          if (error.response?.status === 401) {
+            showError('Please log in to add to your watchlist', itemTitle);
+          } else {
+            showError('Failed to add to watchlist', itemTitle);
+          }
+        }
+      });
+    }
+  }, [watchlistIds, addToWatchlist, removeFromWatchlist, showWatchlistAdded, showWatchlistRemoved, showError]);
 
   const handleMoreInfo = useCallback((show) => {
     handleShowClick(show);
@@ -80,6 +129,7 @@ export default function TVShowsPage() {
         onPlay={handlePlay}
         onAddToWatchlist={handleAddToWatchlist}
         onMoreInfo={handleMoreInfo}
+        isInWatchlist={heroShow ? watchlistIds.has(heroShow.id) : false}
       />
 
       {/* Content Rows */}
@@ -93,6 +143,8 @@ export default function TVShowsPage() {
             movies={trendingData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -105,6 +157,8 @@ export default function TVShowsPage() {
             movies={popularData?.results?.slice(1) || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -117,6 +171,8 @@ export default function TVShowsPage() {
             movies={topRatedData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -129,6 +185,8 @@ export default function TVShowsPage() {
             movies={actionData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -141,6 +199,8 @@ export default function TVShowsPage() {
             movies={comedyData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -153,6 +213,8 @@ export default function TVShowsPage() {
             movies={dramaData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -165,6 +227,8 @@ export default function TVShowsPage() {
             movies={scifiData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -177,6 +241,8 @@ export default function TVShowsPage() {
             movies={mysteryData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
 
@@ -189,6 +255,8 @@ export default function TVShowsPage() {
             movies={crimeData?.results || []}
             onMovieClick={handleShowClick}
             onPlay={handlePlay}
+            onAddToWatchlist={handleAddToWatchlist}
+            watchlistIds={watchlistIds}
           />
         )}
       </div>
@@ -202,7 +270,7 @@ export default function TVShowsPage() {
             onClose={handleCloseModal}
             onPlay={handlePlay}
             onToggleWatchlist={handleAddToWatchlist}
-            isInWatchlist={selectedShow.isInWatchlist}
+            isInWatchlist={watchlistIds.has(selectedShow.id)}
             layoutId={`tv-${selectedShow.id}`}
           />
         )}

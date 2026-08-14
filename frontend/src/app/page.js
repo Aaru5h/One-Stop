@@ -8,6 +8,7 @@ import MovieRow, { MovieRowSkeleton } from '@/components/MovieRow';
 import MovieModal from '@/components/MovieModal';
 import ContinueWatchingRow from '@/components/ContinueWatchingRow';
 import { useHomeFeed, useMovieDetails, useWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from '@/hooks/useMovies';
+import { useToast } from '@/contexts/ToastContext';
 
 // Genre configurations with IDs from TMDB
 const GENRE_ROWS = [
@@ -81,17 +82,23 @@ export default function HomePage() {
     router.push(`/watch?id=${movie.id}&type=${mediaType}`);
   }, [router]);
 
+  const { showWatchlistAdded, showWatchlistRemoved, showError } = useToast();
+
   const handleAddToWatchlist = useCallback((movie) => {
     const movieId = movie.id;
     const isInWatchlist = watchlistIds.has(movieId);
+    const itemTitle = movie.title || movie.name;
 
     if (isInWatchlist) {
       removeFromWatchlist.mutate(movieId, {
+        onSuccess: () => {
+          showWatchlistRemoved(itemTitle, movie.posterPath);
+        },
         onError: (error) => {
           if (error.response?.status === 401) {
-            alert('Please log in to manage your watchlist');
+            showError('Please log in to manage your watchlist', itemTitle);
           } else {
-            alert('Failed to remove from watchlist');
+            showError('Failed to remove from watchlist', itemTitle);
           }
         }
       });
@@ -99,21 +106,24 @@ export default function HomePage() {
       addToWatchlist.mutate({
         movieId,
         data: {
-          title: movie.title,
+          title: itemTitle,
           posterPath: movie.posterPath,
           mediaType: movie.mediaType || 'movie'
         }
       }, {
+        onSuccess: () => {
+          showWatchlistAdded(itemTitle, movie.posterPath);
+        },
         onError: (error) => {
           if (error.response?.status === 401) {
-            alert('Please log in to add to your watchlist');
+            showError('Please log in to add to your watchlist', itemTitle);
           } else {
-            alert('Failed to add to watchlist');
+            showError('Failed to add to watchlist', itemTitle);
           }
         }
       });
     }
-  }, [watchlistIds, addToWatchlist, removeFromWatchlist]);
+  }, [watchlistIds, addToWatchlist, removeFromWatchlist, showWatchlistAdded, showWatchlistRemoved, showError]);
 
   const handleMoreInfo = useCallback((movie) => {
     handleMovieClick(movie);
@@ -128,6 +138,7 @@ export default function HomePage() {
         onPlay={handlePlay}
         onAddToWatchlist={handleAddToWatchlist}
         onMoreInfo={handleMoreInfo}
+        isInWatchlist={heroMovie ? watchlistIds.has(heroMovie.id) : false}
       />
 
       {/* Content Rows */}

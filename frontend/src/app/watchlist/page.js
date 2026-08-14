@@ -1,16 +1,20 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import MovieCard, { MovieCardSkeleton } from '@/components/MovieCard';
 import MovieModal from '@/components/MovieModal';
 import { GlassPanel } from '@/components/ui/GlassCard';
 import MagneticButton from '@/components/ui/MagneticButton';
 import { useWatchlist, useRemoveFromWatchlist, useMovieDetails } from '@/hooks/useMovies';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function WatchlistPage() {
+  const router = useRouter();
   const [selectedMovie, setSelectedMovie] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { showWatchlistRemoved } = useToast();
 
   // Fetch watchlist
   const { data: watchlistData, isLoading } = useWatchlist();
@@ -34,9 +38,20 @@ export default function WatchlistPage() {
     setTimeout(() => setSelectedMovie(null), 300);
   }, []);
 
+  const handlePlay = useCallback((movie) => {
+    const mediaType = movie.mediaType || 'movie';
+    const id = movie.id || movie.movieId;
+    router.push(`/watch?id=${id}&type=${mediaType}`);
+  }, [router]);
+
   const handleRemoveFromWatchlist = useCallback((movie) => {
-    removeFromWatchlist.mutate(movie.movieId || movie.id);
-  }, [removeFromWatchlist]);
+    const itemTitle = movie.title || movie.name;
+    removeFromWatchlist.mutate(movie.movieId || movie.id, {
+      onSuccess: () => {
+        showWatchlistRemoved(itemTitle, movie.posterPath);
+      }
+    });
+  }, [removeFromWatchlist, showWatchlistRemoved]);
 
   // Transform watchlist items to match MovieCard expected format
   const movies = watchlist.map(item => ({
@@ -113,6 +128,9 @@ export default function WatchlistPage() {
                     <MovieCard
                       movie={movie}
                       onClick={handleMovieClick}
+                      onPlay={handlePlay}
+                      onAddToWatchlist={handleRemoveFromWatchlist}
+                      isInWatchlist={true}
                       size="lg"
                       layoutId={`watchlist-movie-${movie.id}`}
                     />
@@ -145,6 +163,7 @@ export default function WatchlistPage() {
         movie={movieDetails || selectedMovie}
         isOpen={isModalOpen}
         onClose={handleCloseModal}
+        onPlay={handlePlay}
         isInWatchlist={true}
         onToggleWatchlist={handleRemoveFromWatchlist}
         layoutId={selectedMovie ? `watchlist-movie-${selectedMovie.id}` : undefined}

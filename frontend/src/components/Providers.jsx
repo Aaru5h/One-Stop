@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 
 export default function Providers({ children }) {
     const [queryClient] = useState(
@@ -21,7 +22,9 @@ export default function Providers({ children }) {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
-                {children}
+                <ToastProvider>
+                    {children}
+                </ToastProvider>
             </AuthProvider>
         </QueryClientProvider>
     );
