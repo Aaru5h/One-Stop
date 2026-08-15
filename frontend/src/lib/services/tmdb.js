@@ -1,9 +1,37 @@
 import axios from 'axios';
+import https from 'https';
+import dns from 'dns';
 import cacheManager from '@/lib/cache/cacheManager';
+
+// Use Cloudflare & Google DNS to prevent ISP DNS timeouts on api.themoviedb.org
+try {
+  dns.setServers(['1.1.1.1', '8.8.8.8', '8.8.4.4']);
+} catch (e) {}
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  lookup: (hostname, options, callback) => {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    dns.resolve4(hostname, (err, addresses) => {
+      if (err || !addresses || addresses.length === 0) {
+        return dns.lookup(hostname, options, callback);
+      }
+      if (options && options.all) {
+        return callback(null, addresses.map(addr => ({ address: addr, family: 4 })));
+      }
+      return callback(null, addresses[0], 4);
+    });
+  }
+});
 
 // Create axios instance for TMDB API
 const tmdbApi = axios.create({
-  baseURL: process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3'
+  baseURL: process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3',
+  timeout: 10000,
+  httpsAgent
 });
 
 // Request interceptor to add API key dynamically

@@ -1,4 +1,10 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// Fix querySrv DNS lookup hangs on macOS / local ISP DNS resolvers
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (e) {}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

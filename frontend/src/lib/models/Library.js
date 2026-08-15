@@ -89,8 +89,7 @@ const librarySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for faster lookups
-librarySchema.index({ userId: 1 });
+// Indexes for faster lookups
 librarySchema.index({ 'watchlist.movieId': 1 });
 librarySchema.index({ 'continueWatching.movieId': 1 });
 
