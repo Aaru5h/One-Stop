@@ -2,10 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { useMovieDetails, useSeasonDetails, useProgress } from '@/hooks/useMovies';
 import { useAuth } from '@/contexts/AuthContext';
 import { libraryApi, movieApi } from '@/lib/api';
+import {
+  STREAM_PROVIDERS,
+  orderProviders,
+  pickProvider,
+  markProviderDown,
+  resetProviderProbes,
+  getDownProviderIds,
+} from '@/lib/streamProviders';
+import { useToast } from '@/contexts/ToastContext';
 import { useQueryClient } from '@tanstack/react-query';
 import './watch.css';
 
@@ -48,18 +57,59 @@ const EpisodesListIcon = () => (
   </svg>
 );
 
-const AutoplayIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-sm">
-    <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71l1.992-7.302H3.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z" clipRule="evenodd" />
+const GearIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="icon-sm" aria-hidden="true">
+    <path d="M10.3 3.9a1.7 1.7 0 0 1 3.4 0 1.7 1.7 0 0 0 2.6 1.1 1.7 1.7 0 0 1 2.4 2.4 1.7 1.7 0 0 0 1.1 2.6 1.7 1.7 0 0 1 0 3.4 1.7 1.7 0 0 0-1.1 2.6 1.7 1.7 0 0 1-2.4 2.4 1.7 1.7 0 0 0-2.6 1.1 1.7 1.7 0 0 1-3.4 0 1.7 1.7 0 0 0-2.6-1.1 1.7 1.7 0 0 1-2.4-2.4 1.7 1.7 0 0 0-1.1-2.6 1.7 1.7 0 0 1 0-3.4 1.7 1.7 0 0 0 1.1-2.6 1.7 1.7 0 0 1 2.4-2.4 1.7 1.7 0 0 0 2.6-1.1z" />
+    <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
-const LoadingSpinner = () => (
-  <div className="watch-loading">
-    <div className="watch-spinner"></div>
-    <p>Loading player...</p>
+// Loading / error screen for the video area. Same look whichever source is playing.
+const StageScreen = ({ backdrop, children }) => (
+  <div className="watch-stage-screen">
+    {backdrop && <img className="watch-stage-backdrop" src={backdrop} alt="" />}
+    <div className="watch-stage-body">{children}</div>
   </div>
 );
+
+const LoadingSpinner = () => (
+  <div className="watch-container">
+    <StageScreen>
+      <div className="watch-spinner" />
+      <p className="watch-stage-status">Loading</p>
+    </StageScreen>
+  </div>
+);
+
+function Popover({ open, label, children }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="watch-menu"
+          role="dialog"
+          aria-label={label}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.14, ease: 'easeOut' }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// If an iframe hasn't fired onLoad by then, treat the provider as hung and move on.
+const IFRAME_LOAD_TIMEOUT_MS = 15000;
+
+// Aspect modes: className applied to .watch-player, cycled by button
+const ASPECT_MODES = [
+  { id: 'default', label: 'Original' },
+  { id: 'stretch', label: 'Stretch' },
+  { id: 'zoom', label: 'Zoom' },
+];
 
 // Helper to parse message events from Vidking iframe player
 function parsePlayerMessage(event) {
@@ -97,11 +147,9 @@ function parsePlayerMessage(event) {
 function usePlayerState() {
   const [isPaused, setIsPaused] = useState(false);
   const [showTitleCard, setShowTitleCard] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const titleCardTimerRef = useRef(null);
-  const controlsTimerRef = useRef(null);
   const iframeRef = useRef(null);
 
+  // Pause/play events only come from providers that postMessage (Vidking).
   useEffect(() => {
     const handleMessage = (event) => {
       const parsed = parsePlayerMessage(event);
@@ -110,9 +158,8 @@ function usePlayerState() {
       const { eventName } = parsed;
       if (eventName === 'play' || eventName === 'playing') {
         setIsPaused(false);
-      } else if (eventName === 'pause' || eventName === 'paused') {
-        setIsPaused(true);
-      } else if (eventName === 'ended') {
+        setShowTitleCard(false);
+      } else if (eventName === 'pause' || eventName === 'paused' || eventName === 'ended') {
         setIsPaused(true);
       }
     };
@@ -121,37 +168,17 @@ function usePlayerState() {
   }, []);
 
   useEffect(() => {
-    if (isPaused) {
-      setShowControls(true);
-      clearTimeout(controlsTimerRef.current);
-      clearTimeout(titleCardTimerRef.current);
-      titleCardTimerRef.current = setTimeout(() => setShowTitleCard(true), 2500);
-    } else {
-      setShowTitleCard(false);
-      clearTimeout(titleCardTimerRef.current);
-      titleCardTimerRef.current = null;
-      clearTimeout(controlsTimerRef.current);
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-    }
-    return () => {
-      clearTimeout(titleCardTimerRef.current);
-      clearTimeout(controlsTimerRef.current);
-    };
+    if (!isPaused) return;
+    const timer = setTimeout(() => setShowTitleCard(true), 2500);
+    return () => clearTimeout(timer);
   }, [isPaused]);
 
-  const handleMouseActivity = useCallback(() => {
-    setShowControls(true);
-    if (!isPaused) {
-      clearTimeout(controlsTimerRef.current);
-      controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
-    } else {
-      setShowTitleCard(false);
-      clearTimeout(titleCardTimerRef.current);
-      titleCardTimerRef.current = setTimeout(() => setShowTitleCard(true), 2500);
-    }
-  }, [isPaused]);
+  const markPlaying = useCallback(() => {
+    setIsPaused(false);
+    setShowTitleCard(false);
+  }, []);
 
-  return { isPaused, showTitleCard, showControls, handleMouseActivity, setIsPaused, iframeRef };
+  return { isPaused, showTitleCard, markPlaying, iframeRef };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -515,15 +542,103 @@ function WatchContent() {
   const [isAutoplayDismissed, setIsAutoplayDismissed] = useState(false);
   const autoplayCountdownIntervalRef = useRef(null);
 
-  // Load autoplay preference from localStorage
+  // preferredId = the user's pick (persisted). providerId = what's actually playing after failover.
+  const [preferredId, setPreferredId] = useState(STREAM_PROVIDERS[0].id);
+  const [providerId, setProviderId] = useState(null);
+  const [providerStatus, setProviderStatus] = useState('checking'); // checking | ready | exhausted
+  const [aspectMode, setAspectMode] = useState(ASPECT_MODES[0].id);
+  const failedIdsRef = useRef(new Set());
+  const resolveRunRef = useRef(0);
+  const { showInfo } = useToast();
+
+  const playFirstReachable = useCallback(async (candidates, failedName) => {
+    const run = ++resolveRunRef.current;
+    setProviderStatus('checking');
+    setIsIframeLoading(true);
+    const picked = await pickProvider(candidates);
+    if (run !== resolveRunRef.current) return;
+    if (!picked) {
+      setProviderId(null);
+      setProviderStatus('exhausted');
+      return;
+    }
+    setProviderId(picked.id);
+    setProviderStatus('ready');
+    const skippedName = failedName ?? (picked !== candidates[0] ? candidates[0].name : null);
+    if (skippedName) showInfo(`${skippedName} isn't working, switched to ${picked.name}`, 'Switched source');
+  }, [showInfo]);
+
+  // Load preferences, then start on the first reachable provider
   useEffect(() => {
+    let preferred = STREAM_PROVIDERS[0].id;
     try {
       const stored = localStorage.getItem('onestop_autoplay_next');
       if (stored !== null) {
         setIsAutoplayEnabled(stored === 'true');
       }
+      const p = localStorage.getItem('onestop_provider');
+      if (p && STREAM_PROVIDERS.some((x) => x.id === p)) preferred = p;
+      const a = localStorage.getItem('onestop_aspect');
+      if (a && ASPECT_MODES.some((x) => x.id === a)) setAspectMode(a);
     } catch {}
+    setPreferredId(preferred);
+    playFirstReachable(orderProviders(preferred));
+  }, [playFirstReachable]);
+
+  const changeProvider = useCallback((id) => {
+    failedIdsRef.current.clear();
+    resetProviderProbes();
+    setPreferredId(id);
+    try { localStorage.setItem('onestop_provider', id); } catch {}
+    playFirstReachable(orderProviders(id));
+  }, [playFirstReachable]);
+
+  // markDown: the domain is unreachable (skip it on other titles too). Otherwise it's just this title.
+  const failover = useCallback((fromId, markDown) => {
+    failedIdsRef.current.add(fromId);
+    if (markDown) markProviderDown(fromId);
+    const from = STREAM_PROVIDERS.find((p) => p.id === fromId);
+    const remaining = orderProviders(preferredId).filter((p) => !failedIdsRef.current.has(p.id));
+    playFirstReachable(remaining, from?.name);
+  }, [preferredId, playFirstReachable]);
+
+  const retryProviders = useCallback(() => {
+    failedIdsRef.current.clear();
+    resetProviderProbes();
+    playFirstReachable(orderProviders(preferredId));
+  }, [preferredId, playFirstReachable]);
+
+  const changeAspect = useCallback((id) => {
+    setAspectMode(id);
+    try { localStorage.setItem('onestop_aspect', id); } catch {}
   }, []);
+
+  // Header menus: 'source' | 'settings' | null
+  const [openMenu, setOpenMenu] = useState(null);
+  const [sourceStatus, setSourceStatus] = useState({ down: [], skipped: [] });
+
+  const toggleMenu = useCallback((menu) => {
+    if (menu === 'source') {
+      setSourceStatus({ down: getDownProviderIds(), skipped: [...failedIdsRef.current] });
+    }
+    setOpenMenu((prev) => (prev === menu ? null : menu));
+  }, []);
+
+  // Close on outside click. Clicks inside the player iframe never reach this document,
+  // so window blur (focus moving into the iframe) closes menus too.
+  useEffect(() => {
+    if (!openMenu) return;
+    const onPointerDown = (e) => {
+      if (!e.target.closest(`[data-menu="${openMenu}"]`)) setOpenMenu(null);
+    };
+    const onBlur = () => setOpenMenu(null);
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [openMenu]);
 
   const toggleAutoplay = useCallback(() => {
     setIsAutoplayEnabled((prev) => {
@@ -535,8 +650,7 @@ function WatchContent() {
     });
   }, []);
 
-  const { isPaused, showTitleCard, showControls, handleMouseActivity, setIsPaused, iframeRef } =
-    usePlayerState();
+  const { isPaused, showTitleCard, markPlaying, iframeRef } = usePlayerState();
 
   const { data: content, isLoading: contentLoading } = useMovieDetails(movieId, mediaType);
   const { data: seasonData, isLoading: isLoadingEpisodes } = useSeasonDetails(
@@ -622,10 +736,10 @@ function WatchContent() {
     setEpisode(1);
     setStartTime(0);
     setIsIframeLoading(true);
-    setIsPaused(false);
+    markPlaying();
     lastSavedTimeRef.current = 0;
     router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${newSeason}&e=1`, { scroll: false });
-  }, [movieId, mediaType, router, setIsPaused]);
+  }, [movieId, mediaType, router, markPlaying]);
 
   const handleEpisodeChange = useCallback((newEpisode, targetSeason) => {
     setShowAutoplayPrompt(false);
@@ -641,11 +755,11 @@ function WatchContent() {
     setEpisode(newEpisode);
     setStartTime(0);
     setIsIframeLoading(true);
-    setIsPaused(false);
+    markPlaying();
     setIsSidebarOpen(false);
     lastSavedTimeRef.current = 0;
     router.replace(`/watch?id=${movieId}&type=${mediaType}&s=${s}&e=${newEpisode}`, { scroll: false });
-  }, [movieId, mediaType, season, router, setIsPaused]);
+  }, [movieId, mediaType, season, router, markPlaying]);
 
   const playNextEpisodeImmediately = useCallback(() => {
     if (!nextEpisodeInfo) return;
@@ -924,25 +1038,30 @@ function WatchContent() {
   }, [movieId, mediaType]);
 
   const embedUrl = useMemo(() => {
-    if (!isInitialized || !movieId) return '';
-    const startParam = startTime > 0 ? `&start=${startTime}` : '';
-    if (mediaType === 'tv') {
-      return `https://www.vidking.net/embed/tv/${movieId}/${season}/${episode}?color=e50914&nextEpisode=true&episodeSelector=true&autoplay=1${startParam}`;
-    }
-    return `https://www.vidking.net/embed/movie/${movieId}?color=e50914&autoplay=1${startParam}`;
-  }, [movieId, mediaType, season, episode, startTime, isInitialized]);
+    const provider = STREAM_PROVIDERS.find((p) => p.id === providerId);
+    if (!isInitialized || !movieId || !provider) return '';
+    return provider.getUrl(mediaType, movieId, season, episode, startTime);
+  }, [movieId, mediaType, season, episode, startTime, isInitialized, providerId]);
+
+  // Watchdog: a provider that never finishes loading gets skipped
+  useEffect(() => {
+    if (providerStatus !== 'ready' || !embedUrl || !isIframeLoading) return;
+    const timer = setTimeout(() => failover(providerId, true), IFRAME_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [providerStatus, embedUrl, isIframeLoading, providerId, failover]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        if (showAutoplayPrompt) cancelAutoplay();
+        if (openMenu) setOpenMenu(null);
+        else if (showAutoplayPrompt) cancelAutoplay();
         else if (isSidebarOpen) setIsSidebarOpen(false);
         else handleBack();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleBack, isSidebarOpen, showAutoplayPrompt, cancelAutoplay]);
+  }, [handleBack, isSidebarOpen, showAutoplayPrompt, cancelAutoplay, openMenu]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -957,31 +1076,180 @@ function WatchContent() {
 
   if (!movieId) return null;
 
-  const title = content?.title || content?.name || 'Loading...';
+  const title = content?.title || content?.name || '';
   const showOverlay = showTitleCard || isSidebarOpen;
-  const showCursor = showOverlay || showControls || showAutoplayPrompt;
-  const isPageLoading = !isInitialized || contentLoading || (isAuthenticated && progressQueryLoading) || isIframeLoading;
+  const isPageLoading = !isInitialized || contentLoading || (isAuthenticated && progressQueryLoading) || providerStatus === 'checking' || isIframeLoading;
+  const activeProvider = STREAM_PROVIDERS.find((p) => p.id === providerId);
+  const currentEpisodeName = seasonData?.episodes?.find((ep) => ep.episodeNumber === episode)?.name;
+  const backdrop = content?.backdropPath || content?.posterPath;
+  const loadingText = providerStatus === 'checking'
+    ? 'Finding a working source'
+    : activeProvider && isIframeLoading
+      ? `Loading ${activeProvider.name}`
+      : 'Loading';
 
   return (
-    <div
-      className={`watch-container ${isPaused ? 'is-paused' : 'is-playing'} ${showCursor ? 'show-overlay' : ''}`}
-      onMouseMove={handleMouseActivity}
-    >
-      {/* ─── Video Player ─── */}
+    <div className="watch-container">
+      {/* ─── Header: always visible, same on every source ─── */}
+      <header className="watch-header">
+        <button className="watch-icon-btn" onClick={handleBack} aria-label="Back">
+          <BackIcon />
+        </button>
+
+        <div className="watch-heading">
+          <h1 className="watch-heading-title">{title}</h1>
+          {mediaType === 'tv' && (
+            <p className="watch-heading-sub">
+              <span className="watch-heading-ep">S{season} E{episode}</span>
+              {currentEpisodeName && <span className="watch-heading-epname">{currentEpisodeName}</span>}
+            </p>
+          )}
+        </div>
+
+        <div className="watch-header-actions">
+          <div className="watch-menu-anchor" data-menu="source">
+            <button
+              className="watch-chip"
+              onClick={() => toggleMenu('source')}
+              aria-haspopup="dialog"
+              aria-expanded={openMenu === 'source'}
+            >
+              <span className={`watch-status-dot ${activeProvider ? 'is-playing' : 'is-pending'}`} aria-hidden="true" />
+              <span className="watch-chip-label">{activeProvider?.name ?? 'Source'}</span>
+              <ChevronDownIcon />
+            </button>
+            <Popover open={openMenu === 'source'} label="Source">
+              <p className="watch-menu-hint">If the video won&apos;t play, pick another source.</p>
+              <div className="watch-menu-list">
+                {STREAM_PROVIDERS.map((p) => {
+                  const isActive = p.id === providerId;
+                  const isDown = sourceStatus.down.includes(p.id);
+                  const isSkipped = sourceStatus.skipped.includes(p.id);
+                  const state = isActive ? 'playing' : isDown ? 'down' : isSkipped ? 'skipped' : 'idle';
+                  const meta = { playing: 'Playing', down: 'Unavailable', skipped: 'Skipped', idle: '' }[state];
+                  return (
+                    <button
+                      key={p.id}
+                      className={`watch-menu-item is-${state}`}
+                      aria-current={isActive ? 'true' : undefined}
+                      onClick={() => { setOpenMenu(null); changeProvider(p.id); }}
+                    >
+                      <span className={`watch-status-dot is-${state}`} aria-hidden="true" />
+                      <span className="watch-menu-item-label">{p.name}</span>
+                      <span className="watch-menu-item-meta">{meta}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {activeProvider && (
+                <button
+                  className="watch-menu-action"
+                  onClick={() => { setOpenMenu(null); failover(activeProvider.id, false); }}
+                >
+                  Try the next source
+                </button>
+              )}
+            </Popover>
+          </div>
+
+          {mediaType === 'tv' && (
+            <button className="watch-btn" onClick={() => { setOpenMenu(null); setIsSidebarOpen((prev) => !prev); }}>
+              <EpisodesListIcon />
+              <span className="watch-btn-label">Episodes</span>
+            </button>
+          )}
+
+          {mediaType === 'tv' && nextEpisodeInfo && (
+            <button
+              className="watch-btn is-primary"
+              onClick={playNextEpisodeImmediately}
+              aria-label={`Next episode: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+            >
+              <SkipNextIcon />
+              <span className="watch-btn-label">Next episode</span>
+            </button>
+          )}
+
+          <div className="watch-menu-anchor" data-menu="settings">
+            <button
+              className="watch-icon-btn"
+              onClick={() => toggleMenu('settings')}
+              aria-label="Settings"
+              aria-haspopup="dialog"
+              aria-expanded={openMenu === 'settings'}
+            >
+              <GearIcon />
+            </button>
+            <Popover open={openMenu === 'settings'} label="Settings">
+              <div className="watch-menu-section">
+                <p className="watch-menu-heading" id="watch-picture-label">Picture</p>
+                <div className="watch-segmented" role="radiogroup" aria-labelledby="watch-picture-label">
+                  {ASPECT_MODES.map((m) => (
+                    <button
+                      key={m.id}
+                      role="radio"
+                      aria-checked={aspectMode === m.id}
+                      className={`watch-segment ${aspectMode === m.id ? 'is-selected' : ''}`}
+                      onClick={() => changeAspect(m.id)}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="watch-menu-hint">Use Stretch or Zoom if the picture looks squished.</p>
+              </div>
+              {mediaType === 'tv' && (
+                <div className="watch-menu-section">
+                  <label className="autoplay-toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={isAutoplayEnabled}
+                      onChange={toggleAutoplay}
+                      className="autoplay-checkbox"
+                    />
+                    <span className="autoplay-toggle-slider"></span>
+                    <span className="autoplay-toggle-text">Autoplay next episode</span>
+                  </label>
+                </div>
+              )}
+            </Popover>
+          </div>
+        </div>
+      </header>
+
+      {/* ─── Video area ─── */}
       <div className="watch-player-wrapper">
-        {isPageLoading && <LoadingSpinner />}
+        {providerStatus === 'exhausted' ? (
+          <StageScreen backdrop={backdrop}>
+            <h2 className="watch-stage-title">No source can play this right now</h2>
+            <p className="watch-stage-text">
+              All sources are down or don&apos;t have this title. Try again in a few minutes, or pick a source from the menu above.
+            </p>
+            <div className="watch-stage-actions">
+              <button className="watch-btn is-primary" onClick={retryProviders}>Try again</button>
+              <button className="watch-btn" onClick={handleBack}>Go back</button>
+            </div>
+          </StageScreen>
+        ) : (
+          isPageLoading && (
+            <StageScreen backdrop={backdrop}>
+              <div className="watch-spinner" />
+              <p className="watch-stage-status" aria-live="polite">{loadingText}</p>
+            </StageScreen>
+          )
+        )}
         <motion.div
-          className="watch-player"
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: isIframeLoading ? 0 : 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+          className={`watch-player watch-aspect-${aspectMode}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isIframeLoading ? 0 : 1 }}
+          transition={{ duration: 0.4 }}
         >
-          {isInitialized && (
+          {isInitialized && providerStatus === 'ready' && embedUrl && (
             <iframe
               ref={iframeRef}
               key={embedUrl}
               src={embedUrl}
-              title={title}
+              title={title || 'Video player'}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               className="watch-iframe"
@@ -989,92 +1257,20 @@ function WatchContent() {
             />
           )}
         </motion.div>
+
+        {/* ─── Dimmed overlay (paused or episode panel open) ─── */}
+        <AnimatePresence>
+          {showOverlay && (
+            <motion.div
+              className="pause-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            />
+          )}
+        </AnimatePresence>
       </div>
-
-      {/* ─── Dimmed Overlay (paused or sidebar) ─── */}
-      <AnimatePresence>
-        {showOverlay && (
-          <motion.div
-            className="pause-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ─── Top Controls Bar — visible when controls shown ─── */}
-      <AnimatePresence>
-        {(showControls || isSidebarOpen) && (
-          <motion.div
-            className="watch-top-controls"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-          >
-            <div className="watch-top-left">
-              <motion.button
-                className="watch-back-btn"
-                onClick={handleBack}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <BackIcon />
-                <span>Back</span>
-              </motion.button>
-              <div className="watch-top-title-info">
-                <span className="watch-top-title">{title}</span>
-                {mediaType === 'tv' && (
-                  <span className="watch-top-badge">S{season} E{episode}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="watch-top-actions">
-              {mediaType === 'tv' && (
-                <>
-                  <motion.button
-                    className={`watch-top-btn watch-autoplay-toggle-btn ${isAutoplayEnabled ? 'is-active' : ''}`}
-                    onClick={toggleAutoplay}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    title={isAutoplayEnabled ? 'Autoplay Next: Enabled' : 'Autoplay Next: Disabled'}
-                  >
-                    <AutoplayIcon />
-                    <span>Autoplay: {isAutoplayEnabled ? 'ON' : 'OFF'}</span>
-                  </motion.button>
-
-                  {nextEpisodeInfo && (
-                    <motion.button
-                      className="watch-top-btn"
-                      onClick={playNextEpisodeImmediately}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      title={`Next Episode (S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode})`}
-                    >
-                      <SkipNextIcon />
-                      <span>Next Ep</span>
-                    </motion.button>
-                  )}
-
-                  <motion.button
-                    className="watch-top-btn"
-                    onClick={() => setIsSidebarOpen((prev) => !prev)}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    title="Episodes List"
-                  >
-                    <EpisodesListIcon />
-                    <span>Episodes</span>
-                  </motion.button>
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ─── Netflix-Style Autoplay Next Episode Countdown Overlay ─── */}
       <AnimatePresence>
@@ -1126,35 +1322,16 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Gradient Overlays ─── */}
-      <AnimatePresence>
-        {showOverlay && (
-          <>
-            <motion.div
-              className="watch-gradient-top"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6 }}
-            />
-            <motion.div
-              className="watch-gradient-bottom"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6 }}
-            />
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
 export default function WatchPage() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <WatchContent />
-    </Suspense>
+    <MotionConfig reducedMotion="user">
+      <Suspense fallback={<LoadingSpinner />}>
+        <WatchContent />
+      </Suspense>
+    </MotionConfig>
   );
 }

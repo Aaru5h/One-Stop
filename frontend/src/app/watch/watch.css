@@ -1,16 +1,8 @@
 /* ═══════════════════════════════════════════════════════════
-   Watch Page — Cinema-Grade Streaming Experience
-   ═══════════════════════════════════════════════════════════
-   Provider: Vidking Player (postMessage API for play/pause/timeupdate/ended)
-   
-   Visual states:
-   1. Playing (clean)    → nothing visible, cursor hidden, pure cinema
-   2. Paused + idle      → dimmed overlay, title card, controls fade in
-   3. Sidebar open       → right-side episode panel slides in
-   4. Autoplay Card      → Netflix-style next episode countdown & quick switch
-
-   Design Language: Glassmorphism, Netflix-grade typography,
-   spring animations via Framer Motion.
+   Watch Page
+   The video comes from third-party embeds we can't style, so everything
+   we own (header, menus, loading/error screens, episode panel, up-next
+   card) is built to look identical whichever source is playing.
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── Variables ─── */
@@ -27,6 +19,13 @@
   --watch-green: #46d369;
   --watch-sidebar-width: 420px;
   --watch-transition: cubic-bezier(0.4, 0, 0.2, 1);
+  --watch-header-height: 64px;
+  --watch-surface-1: #161616;
+  --watch-surface-2: rgba(255, 255, 255, 0.08);
+  --watch-surface-3: rgba(255, 255, 255, 0.14);
+  --watch-line: rgba(255, 255, 255, 0.08);
+  --watch-line-strong: rgba(255, 255, 255, 0.16);
+  --watch-amber: #e0a43a;
 }
 
 /* ─── Icon Sizes ─── */
@@ -41,14 +40,8 @@
   z-index: 100;
   display: flex;
   flex-direction: column;
-  cursor: none;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans-nunito), system-ui, sans-serif;
   overflow: hidden;
-}
-
-.watch-container.is-paused,
-.watch-container.show-overlay {
-  cursor: default;
 }
 
 /* ─── Video Player (Always Visible) ─── */
@@ -74,6 +67,14 @@
   display: block;
 }
 
+/* Aspect-ratio compensation for anamorphic upstream rips.
+   ponytail: outer-container transform; can't touch cross-origin <video>. */
+.watch-aspect-default .watch-iframe { transform: none; }
+.watch-aspect-stretch { overflow: hidden; }
+.watch-aspect-stretch .watch-iframe { transform: scaleX(1.77); transform-origin: center; }
+.watch-aspect-zoom { overflow: hidden; }
+.watch-aspect-zoom .watch-iframe { transform: scale(1.35); transform-origin: center; }
+
 /* ─── Pause Overlay (Dimmed Backdrop) ─── */
 .pause-overlay {
   position: absolute;
@@ -84,97 +85,221 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Top Controls Bar
+   Header (always visible; the player's fullscreen hides it)
    ═══════════════════════════════════════════════════════════ */
-.watch-top-controls {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+.watch-header {
+  position: relative;
   z-index: 25;
+  flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  pointer-events: auto;
+  gap: 0.75rem;
+  height: var(--watch-header-height);
+  padding: 0 1rem 0 0.75rem;
+  background: #000;
+  border-bottom: 1px solid var(--watch-line);
 }
 
-.watch-top-left {
+.watch-heading {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.watch-top-title-info {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.watch-top-title {
-  font-size: 0.95rem;
-  font-weight: 600;
+.watch-heading-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
   color: var(--watch-text-primary);
-  letter-spacing: -0.01em;
-  max-width: 320px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.watch-top-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: var(--watch-accent);
-  color: #fff;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.watch-top-actions {
+.watch-heading-sub {
+  margin: 0;
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--watch-text-secondary);
 }
 
-/* ─── Common Top Button ─── */
-.watch-back-btn,
-.watch-top-btn {
+.watch-heading-ep {
+  flex: none;
+  font-weight: 700;
+  color: var(--watch-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.watch-heading-epname {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.watch-header-actions {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6rem 1.1rem;
-  background: var(--watch-glass-bg);
-  backdrop-filter: var(--watch-glass-blur);
-  -webkit-backdrop-filter: var(--watch-glass-blur);
-  border: 1px solid var(--watch-glass-border);
-  border-radius: 50px;
+}
+
+/* ─── Buttons ─── */
+.watch-icon-btn,
+.watch-btn,
+.watch-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: var(--watch-text-primary);
-  font-size: 0.85rem;
-  font-weight: 500;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  transition: all 0.25s var(--watch-transition);
-  letter-spacing: 0.01em;
-  font-family: inherit;
-  user-select: none;
+  transition: background-color 0.15s var(--watch-transition), color 0.15s var(--watch-transition);
 }
 
-.watch-back-btn:hover,
-.watch-top-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.16);
+.watch-icon-btn { width: 40px; flex: none; }
+.watch-btn { padding: 0 0.875rem; background: var(--watch-surface-2); }
+.watch-chip { padding: 0 0.625rem 0 0.75rem; border-color: var(--watch-line-strong); }
+.watch-chip svg { color: var(--watch-text-tertiary); }
+
+.watch-icon-btn:hover,
+.watch-btn:hover,
+.watch-chip:hover,
+.watch-icon-btn[aria-expanded="true"],
+.watch-chip[aria-expanded="true"] {
+  background: var(--watch-surface-3);
 }
 
-.watch-autoplay-toggle-btn.is-active {
-  border-color: rgba(229, 9, 20, 0.4);
-  color: #fff;
+.watch-btn.is-primary { background: var(--watch-accent); color: #fff; }
+.watch-btn.is-primary:hover { background: var(--watch-accent-hover); }
+
+.watch-container button:focus-visible,
+.autoplay-checkbox:focus-visible + .autoplay-toggle-slider {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
-.watch-autoplay-toggle-btn.is-active svg {
-  color: var(--watch-accent);
+/* ─── Source status dots ─── */
+.watch-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--watch-text-tertiary);
 }
+.watch-status-dot.is-playing { background: var(--watch-green); box-shadow: 0 0 0 3px rgba(70, 211, 105, 0.18); }
+.watch-status-dot.is-skipped { background: var(--watch-amber); }
+.watch-status-dot.is-down { background: transparent; border: 1.5px solid var(--watch-text-tertiary); }
+.watch-status-dot.is-pending { animation: watch-pulse 1.2s ease-in-out infinite; }
+
+@keyframes watch-pulse {
+  50% { opacity: 0.3; }
+}
+
+/* ─── Menus ─── */
+.watch-menu-anchor { position: relative; }
+
+.watch-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 280px;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem;
+  background: var(--watch-surface-1);
+  border: 1px solid var(--watch-line-strong);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.watch-menu-hint {
+  margin: 0.25rem 0.5rem 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--watch-text-secondary);
+}
+
+.watch-menu-list { display: flex; flex-direction: column; }
+
+.watch-menu-item,
+.watch-menu-action {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.625rem 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--watch-text-primary);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.watch-menu-item:hover,
+.watch-menu-action:hover { background: var(--watch-surface-3); }
+.watch-menu-item.is-playing { font-weight: 700; }
+.watch-menu-item.is-down .watch-menu-item-label { color: var(--watch-text-tertiary); }
+.watch-menu-item-label { flex: 1; }
+.watch-menu-item-meta { font-size: 0.8125rem; color: var(--watch-text-tertiary); }
+
+.watch-menu-action {
+  margin-top: 0.375rem;
+  border-top: 1px solid var(--watch-line);
+  border-radius: 0 0 8px 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.watch-menu-section { padding: 0.5rem; }
+.watch-menu-section + .watch-menu-section { border-top: 1px solid var(--watch-line); }
+.watch-menu-section .watch-menu-hint { margin: 0.5rem 0 0; }
+
+.watch-menu-heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--watch-text-secondary);
+}
+
+.watch-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px;
+  background: var(--watch-surface-2);
+  border-radius: 8px;
+}
+
+.watch-segment {
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--watch-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.watch-segment:hover { color: var(--watch-text-primary); }
+.watch-segment.is-selected { background: var(--watch-surface-3); color: #fff; }
 
 /* ═══════════════════════════════════════════════════════════
    Netflix-Style Autoplay Next Episode Overlay Card
@@ -678,10 +803,8 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  background: rgba(10, 10, 10, 0.92);
-  backdrop-filter: blur(30px) saturate(1.6);
-  -webkit-backdrop-filter: blur(30px) saturate(1.6);
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0d0d0d;
+  border-left: 1px solid var(--watch-line);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
   pointer-events: auto;
   overflow: hidden;
@@ -960,26 +1083,71 @@
   margin: 0;
 }
 
-/* ─── Loading State ─── */
-.watch-loading {
+/* ─── Stage screen (loading / no source) ─── */
+.watch-stage-screen {
   position: absolute;
   inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+
+.watch-stage-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.3;
+}
+
+.watch-stage-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.9) 75%);
+}
+
+.watch-stage-body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  color: white;
-  z-index: 5;
-  background: #000;
+  gap: 1rem;
+  max-width: 34rem;
+  padding: 0 1rem;
+  text-align: center;
 }
 
-.watch-loading p {
-  font-size: 0.9rem;
-  color: var(--watch-text-tertiary);
+.watch-stage-status {
   margin: 0;
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  font-size: 0.9375rem;
+  color: var(--watch-text-secondary);
+}
+
+.watch-stage-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.5vw, 1.625rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--watch-text-primary);
+}
+
+.watch-stage-text {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--watch-text-secondary);
+}
+
+.watch-stage-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .watch-spinner {
@@ -995,39 +1163,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* ─── Gradient Overlays ─── */
-.watch-gradient-top {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 160px;
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.25) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 10;
-}
-
-.watch-gradient-bottom {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 220px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.8) 0%,
-    rgba(0, 0, 0, 0.35) 40%,
-    transparent 100%
-  );
-  pointer-events: none;
-  z-index: 10;
-}
-
 /* ═══════════════════════════════════════════════════════════
    Responsive Design
    ═══════════════════════════════════════════════════════════ */
@@ -1036,23 +1171,30 @@
     --watch-sidebar-width: 320px;
   }
 
-  .watch-top-controls {
-    padding: 0.85rem 1rem;
+  :root {
+    --watch-header-height: 56px;
   }
 
-  .watch-back-btn span,
-  .watch-top-btn span {
+  .watch-header {
+    gap: 0.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .watch-btn-label {
     display: none;
   }
 
-  .watch-back-btn,
-  .watch-top-btn {
-    padding: 0.55rem 0.75rem;
+  .watch-btn {
+    width: 40px;
+    padding: 0;
   }
 
-  .watch-top-title {
-    max-width: 140px;
-    font-size: 0.85rem;
+  .watch-heading-title {
+    font-size: 0.9375rem;
+  }
+
+  .watch-heading-sub {
+    font-size: 0.75rem;
   }
 
   .autoplay-next-card {
@@ -1153,4 +1295,21 @@
     -webkit-line-clamp: 1;
     font-size: 0.7rem;
   }
+}
+
+@media (max-width: 480px) {
+  /* Anchor menus to the header edge so they can't run off the left of the screen */
+  .watch-menu-anchor { position: static; }
+  .watch-menu { right: 0.5rem; top: calc(100% + 4px); }
+}
+
+@media (max-width: 400px) {
+  .watch-chip-label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-spinner { animation-duration: 2.4s; }
+  .watch-status-dot.is-pending { animation: none; }
 }
