@@ -7,6 +7,8 @@ import clsx from 'clsx';
 import { GlassModal } from '@/components/ui/GlassCard';
 import MagneticButton from '@/components/ui/MagneticButton';
 import TextPressure from '@/components/ui/TextPressure';
+import Link from 'next/link';
+import { titlePath } from '@/lib/seo';
 
 // Icons
 const CloseIcon = () => (
@@ -129,7 +131,7 @@ export default function MovieModal({
                                     {/* Tagline */}
                                     {movie.tagline && (
                                         <p className="text-white/60 italic text-lg mb-4">
-                                            "{movie.tagline}"
+                                            &ldquo;{movie.tagline}&rdquo;
                                         </p>
                                     )}
 
@@ -227,6 +229,15 @@ export default function MovieModal({
                                         >
                                             {isInWatchlist ? 'In Watchlist' : 'Add to Watchlist'}
                                         </MagneticButton>
+
+                                        {/* Full page: seasons, cast, similar titles (and the indexable URL for this title) */}
+                                        <Link
+                                            href={titlePath(movie)}
+                                            onClick={onClose}
+                                            className="inline-flex items-center h-14 px-6 rounded-full text-white/80 font-semibold hover:text-white hover:bg-white/10 transition-colors"
+                                        >
+                                            Details
+                                        </Link>
                                     </div>
                                 </div>
                             </div>

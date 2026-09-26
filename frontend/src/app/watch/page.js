@@ -64,6 +64,18 @@ const GearIcon = () => (
   </svg>
 );
 
+const CheckCircleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="icon-xs" aria-hidden="true">
+    <path fillRule="evenodd" d="M2.25 12a9.75 9.75 0 1 1 19.5 0 9.75 9.75 0 0 1-19.5 0zm13.36-1.81a.75.75 0 1 0-1.22-.88l-3.24 4.53-1.62-1.62a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.1l3.75-5.24z" clipRule="evenodd" />
+  </svg>
+);
+
+const ChevronIcon = ({ dir }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="icon-sm" aria-hidden="true">
+    <path d={dir === 'left' ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+  </svg>
+);
+
 // Loading / error screen for the video area. Same look whichever source is playing.
 const StageScreen = ({ backdrop, children }) => (
   <div className="watch-stage-screen">
@@ -81,7 +93,7 @@ const LoadingSpinner = () => (
   </div>
 );
 
-function Popover({ open, label, children }) {
+function Popover({ open, label, onClose, children }) {
   return (
     <AnimatePresence>
       {open && (
@@ -89,11 +101,17 @@ function Popover({ open, label, children }) {
           className="watch-menu"
           role="dialog"
           aria-label={label}
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.14, ease: 'easeOut' }}
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
         >
+          <div className="watch-menu-top">
+            <p className="watch-menu-title">{label}</p>
+            <button className="watch-menu-close" onClick={onClose} aria-label={`Close ${label.toLowerCase()}`}>
+              <CloseIcon />
+            </button>
+          </div>
           {children}
         </motion.div>
       )}
@@ -311,9 +329,9 @@ function AutoplayNextCard({
 }
 
 // ─────────────────────────────────────────────────────────
-// Episode Sidebar Component
+// Episode Strip (bottom-docked carousel, Cinejoy-style)
 // ─────────────────────────────────────────────────────────
-function EpisodeSidebar({
+function EpisodeStrip({
   seasons,
   currentSeason,
   currentEpisode,
@@ -326,40 +344,33 @@ function EpisodeSidebar({
   onToggleAutoplay,
 }) {
   const episodes = seasonData?.episodes || [];
+  const railRef = useRef(null);
   const activeEpisodeRef = useRef(null);
 
   useEffect(() => {
-    if (activeEpisodeRef.current) {
-      activeEpisodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    activeEpisodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }, [currentEpisode, currentSeason, episodes]);
 
-  return (
-    <motion.div
-      className="episode-sidebar"
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-    >
-      <div className="sidebar-header">
-        <h2 className="sidebar-title">Episodes</h2>
-        <motion.button
-          className="sidebar-close-btn"
-          onClick={onClose}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          <CloseIcon />
-        </motion.button>
-      </div>
+  const page = (dir) => {
+    const rail = railRef.current;
+    if (rail) rail.scrollBy({ left: dir * rail.clientWidth * 0.85, behavior: 'smooth' });
+  };
 
-      <div className="sidebar-season-selector">
-        <div className="sidebar-select-wrapper">
+  return (
+    <motion.section
+      className="episode-strip"
+      aria-label="Episodes"
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 24 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className="strip-top">
+        <div className="strip-season">
           <select
             value={currentSeason}
             onChange={(e) => onSeasonChange(Number(e.target.value))}
-            className="sidebar-season-select"
+            aria-label="Season"
           >
             {(seasons || []).map((s) => (
               <option key={s.seasonNumber} value={s.seasonNumber}>
@@ -369,10 +380,8 @@ function EpisodeSidebar({
           </select>
           <ChevronDownIcon />
         </div>
-      </div>
 
-      <div className="sidebar-autoplay-bar">
-        <label className="autoplay-toggle-label">
+        <label className="autoplay-toggle-label strip-autoplay">
           <input
             type="checkbox"
             checked={isAutoplayEnabled}
@@ -380,59 +389,62 @@ function EpisodeSidebar({
             className="autoplay-checkbox"
           />
           <span className="autoplay-toggle-slider"></span>
-          <span className="autoplay-toggle-text">Autoplay next episode</span>
+          <span className="autoplay-toggle-text">Autoplay</span>
         </label>
+
+        <button className="watch-menu-close" onClick={onClose} aria-label="Close episodes">
+          <CloseIcon />
+        </button>
       </div>
 
-      {seasonData?.overview && (
-        <p className="sidebar-season-overview">{seasonData.overview}</p>
-      )}
+      <div className="strip-body">
+        <button className="strip-nav is-prev" onClick={() => page(-1)} aria-label="Previous episodes">
+          <ChevronIcon dir="left" />
+        </button>
 
-      <div className="sidebar-episode-list">
-        {isLoadingEpisodes ? (
-          <div className="sidebar-loading">
-            <div className="sidebar-spinner"></div>
-            <p>Loading episodes...</p>
-          </div>
-        ) : episodes.length === 0 ? (
-          <div className="sidebar-empty">
-            <p>No episodes available</p>
-          </div>
-        ) : (
-          episodes.map((ep) => {
-            const isActive = ep.episodeNumber === currentEpisode;
-            return (
-              <motion.button
-                key={ep.episodeNumber}
-                ref={isActive ? activeEpisodeRef : null}
-                className={`sidebar-episode-item ${isActive ? 'is-active' : ''}`}
-                onClick={() => { if (!isActive) onEpisodeChange(ep.episodeNumber); }}
-                whileHover={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
-                whileTap={{ scale: 0.98 }}
-                layout
-              >
-                <div className="episode-thumb-wrapper">
-                  {ep.stillPath ? (
-                    <img src={ep.stillPath} alt={ep.name} className="episode-thumb" loading="lazy" />
-                  ) : (
-                    <div className="episode-thumb-placeholder">
-                      <span>{ep.episodeNumber}</span>
-                    </div>
-                  )}
-                  {isActive && <span className="episode-watching-badge">WATCHING</span>}
-                  <span className="episode-number-badge">{ep.episodeNumber}</span>
-                </div>
-                <div className="episode-info">
-                  <h4 className="episode-title">{ep.name || `Episode ${ep.episodeNumber}`}</h4>
-                  {ep.runtime && <span className="episode-runtime">{ep.runtime} min</span>}
-                  {ep.overview && <p className="episode-overview">{ep.overview}</p>}
-                </div>
-              </motion.button>
-            );
-          })
-        )}
+        <div className="strip-rail" ref={railRef}>
+          {isLoadingEpisodes ? (
+            <div className="strip-empty"><div className="watch-spinner is-small" /></div>
+          ) : episodes.length === 0 ? (
+            <div className="strip-empty"><p>No episodes available</p></div>
+          ) : (
+            episodes.map((ep) => {
+              const isActive = ep.episodeNumber === currentEpisode;
+              return (
+                <button
+                  key={ep.episodeNumber}
+                  ref={isActive ? activeEpisodeRef : null}
+                  className={`strip-card ${isActive ? 'is-active' : ''}`}
+                  aria-current={isActive ? 'true' : undefined}
+                  onClick={() => { if (!isActive) onEpisodeChange(ep.episodeNumber); }}
+                >
+                  <div className="strip-thumb">
+                    {ep.stillPath ? (
+                      <img src={ep.stillPath} alt="" loading="lazy" />
+                    ) : (
+                      <span className="strip-thumb-fallback">{ep.episodeNumber}</span>
+                    )}
+                    <span className="strip-tag">
+                      S{currentSeason}E{ep.episodeNumber}{isActive ? ' · Now Playing' : ''}
+                    </span>
+                    {!isActive && <span className="strip-play" aria-hidden="true"><PlayIcon /></span>}
+                  </div>
+                  <div className="strip-info">
+                    <h4 className="strip-title">{ep.name || `Episode ${ep.episodeNumber}`}</h4>
+                    {ep.overview && <p className="strip-overview">{ep.overview}</p>}
+                    {ep.runtime && <span className="strip-runtime">{ep.runtime} min</span>}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <button className="strip-nav is-next" onClick={() => page(1)} aria-label="More episodes">
+          <ChevronIcon dir="right" />
+        </button>
       </div>
-    </motion.div>
+    </motion.section>
   );
 }
 
@@ -467,7 +479,10 @@ function TitleCard({ content, mediaType, season, episode, seasonData, onOpenEpis
             <span className="title-card-year">{new Date(content.releaseDate).getFullYear()}</span>
           )}
           {content?.voteAverage > 0 && (
-            <span className="title-card-rating">★ {content.voteAverage.toFixed(1)}</span>
+            <span className="title-card-rating">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.1 2.9a1 1 0 0 1 1.8 0l2.3 4.7 5.2.8a1 1 0 0 1 .6 1.7l-3.8 3.7.9 5.2a1 1 0 0 1-1.5 1l-4.6-2.4-4.6 2.4a1 1 0 0 1-1.5-1l.9-5.2-3.8-3.7a1 1 0 0 1 .6-1.7l5.2-.8 2.3-4.7z" /></svg>
+              {content.voteAverage.toFixed(1)}
+            </span>
           )}
           {content?.genres?.length > 0 && (
             <span className="title-card-genres">
@@ -541,6 +556,7 @@ function WatchContent() {
   const [autoplayCountdown, setAutoplayCountdown] = useState(8);
   const [isAutoplayDismissed, setIsAutoplayDismissed] = useState(false);
   const autoplayCountdownIntervalRef = useRef(null);
+  const lastSavedTimeRef = useRef(0);
 
   // preferredId = the user's pick (persisted). providerId = what's actually playing after failover.
   const [preferredId, setPreferredId] = useState(STREAM_PROVIDERS[0].id);
@@ -613,12 +629,12 @@ function WatchContent() {
     try { localStorage.setItem('onestop_aspect', id); } catch {}
   }, []);
 
-  // Header menus: 'source' | 'settings' | null
+  // Header menu: 'settings' | null (server list lives inside it)
   const [openMenu, setOpenMenu] = useState(null);
   const [sourceStatus, setSourceStatus] = useState({ down: [], skipped: [] });
 
   const toggleMenu = useCallback((menu) => {
-    if (menu === 'source') {
+    if (menu === 'settings') {
       setSourceStatus({ down: getDownProviderIds(), skipped: [...failedIdsRef.current] });
     }
     setOpenMenu((prev) => (prev === menu ? null : menu));
@@ -825,7 +841,6 @@ function WatchContent() {
   const isAutoplayDismissedRef = useRef(isAutoplayDismissed);
   const showAutoplayPromptRef = useRef(showAutoplayPrompt);
   const currentPlaybackStateRef = useRef({ currentTime: 0, duration: 0, progress: 0 });
-  const lastSavedTimeRef = useRef(0);
 
   useEffect(() => { contentRef.current = content; }, [content]);
   useEffect(() => { seasonRef.current = season; }, [season]);
@@ -1090,11 +1105,13 @@ function WatchContent() {
 
   return (
     <div className="watch-container">
-      {/* ─── Header: always visible, same on every source ─── */}
+      {/* ─── Header: back · centered title · controls. Same on every source. ─── */}
       <header className="watch-header">
-        <button className="watch-icon-btn" onClick={handleBack} aria-label="Back">
-          <BackIcon />
-        </button>
+        <div className="watch-header-side">
+          <button className="watch-icon-btn" onClick={handleBack} aria-label="Back" title="Back">
+            <BackIcon />
+          </button>
+        </div>
 
         <div className="watch-heading">
           <h1 className="watch-heading-title">{title}</h1>
@@ -1106,81 +1123,76 @@ function WatchContent() {
           )}
         </div>
 
-        <div className="watch-header-actions">
-          <div className="watch-menu-anchor" data-menu="source">
-            <button
-              className="watch-chip"
-              onClick={() => toggleMenu('source')}
-              aria-haspopup="dialog"
-              aria-expanded={openMenu === 'source'}
-            >
-              <span className={`watch-status-dot ${activeProvider ? 'is-playing' : 'is-pending'}`} aria-hidden="true" />
-              <span className="watch-chip-label">{activeProvider?.name ?? 'Source'}</span>
-              <ChevronDownIcon />
-            </button>
-            <Popover open={openMenu === 'source'} label="Source">
-              <p className="watch-menu-hint">If the video won&apos;t play, pick another source.</p>
-              <div className="watch-menu-list">
-                {STREAM_PROVIDERS.map((p) => {
-                  const isActive = p.id === providerId;
-                  const isDown = sourceStatus.down.includes(p.id);
-                  const isSkipped = sourceStatus.skipped.includes(p.id);
-                  const state = isActive ? 'playing' : isDown ? 'down' : isSkipped ? 'skipped' : 'idle';
-                  const meta = { playing: 'Playing', down: 'Unavailable', skipped: 'Skipped', idle: '' }[state];
-                  return (
-                    <button
-                      key={p.id}
-                      className={`watch-menu-item is-${state}`}
-                      aria-current={isActive ? 'true' : undefined}
-                      onClick={() => { setOpenMenu(null); changeProvider(p.id); }}
-                    >
-                      <span className={`watch-status-dot is-${state}`} aria-hidden="true" />
-                      <span className="watch-menu-item-label">{p.name}</span>
-                      <span className="watch-menu-item-meta">{meta}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {activeProvider && (
-                <button
-                  className="watch-menu-action"
-                  onClick={() => { setOpenMenu(null); failover(activeProvider.id, false); }}
-                >
-                  Try the next source
-                </button>
-              )}
-            </Popover>
-          </div>
-
-          {mediaType === 'tv' && (
-            <button className="watch-btn" onClick={() => { setOpenMenu(null); setIsSidebarOpen((prev) => !prev); }}>
-              <EpisodesListIcon />
-              <span className="watch-btn-label">Episodes</span>
-            </button>
-          )}
-
+        <div className="watch-header-side is-end">
           {mediaType === 'tv' && nextEpisodeInfo && (
             <button
-              className="watch-btn is-primary"
+              className="watch-icon-btn"
               onClick={playNextEpisodeImmediately}
               aria-label={`Next episode: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
+              title={`Next: S${nextEpisodeInfo.season} E${nextEpisodeInfo.episode}`}
             >
               <SkipNextIcon />
-              <span className="watch-btn-label">Next episode</span>
             </button>
           )}
 
+          {mediaType === 'tv' && (
+            <button
+              className="watch-icon-btn"
+              onClick={() => { setOpenMenu(null); setIsSidebarOpen((prev) => !prev); }}
+              aria-label="Episodes"
+              aria-expanded={isSidebarOpen}
+              title="Episodes"
+            >
+              <EpisodesListIcon />
+            </button>
+          )}
+
+          {/* One menu for everything we own: server, picture, autoplay. Keeps the top bar to back · title · gear. */}
           <div className="watch-menu-anchor" data-menu="settings">
             <button
               className="watch-icon-btn"
               onClick={() => toggleMenu('settings')}
-              aria-label="Settings"
+              aria-label={`Settings (server: ${activeProvider?.name ?? 'none'})`}
               aria-haspopup="dialog"
               aria-expanded={openMenu === 'settings'}
+              title="Settings"
             >
               <GearIcon />
+              <span className={`watch-status-dot is-badge ${activeProvider ? 'is-playing' : 'is-pending'}`} aria-hidden="true" />
             </button>
-            <Popover open={openMenu === 'settings'} label="Settings">
+            <Popover open={openMenu === 'settings'} label="Settings" onClose={() => setOpenMenu(null)}>
+              <div className="watch-menu-section">
+                <p className="watch-menu-heading" id="watch-server-label">Server</p>
+                <div className="watch-menu-list" role="group" aria-labelledby="watch-server-label">
+                  {STREAM_PROVIDERS.map((p) => {
+                    const isActive = p.id === providerId;
+                    const isDown = sourceStatus.down.includes(p.id);
+                    const isSkipped = sourceStatus.skipped.includes(p.id);
+                    const state = isActive ? 'playing' : isDown ? 'down' : isSkipped ? 'skipped' : 'idle';
+                    const meta = { down: 'Unavailable', skipped: 'Skipped' }[state];
+                    return (
+                      <button
+                        key={p.id}
+                        className={`watch-menu-item is-${state}`}
+                        aria-current={isActive ? 'true' : undefined}
+                        onClick={() => { setOpenMenu(null); changeProvider(p.id); }}
+                      >
+                        <span className="watch-menu-item-label">{p.name}</span>
+                        {meta && <span className="watch-menu-item-meta">{meta}</span>}
+                        {isActive && <span className="watch-menu-check"><CheckCircleIcon /></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {activeProvider && (
+                  <button
+                    className="watch-menu-action"
+                    onClick={() => { setOpenMenu(null); failover(activeProvider.id, false); }}
+                  >
+                    Video not playing? Try the next server
+                  </button>
+                )}
+              </div>
               <div className="watch-menu-section">
                 <p className="watch-menu-heading" id="watch-picture-label">Picture</p>
                 <div className="watch-segmented" role="radiogroup" aria-labelledby="watch-picture-label">
@@ -1223,7 +1235,7 @@ function WatchContent() {
           <StageScreen backdrop={backdrop}>
             <h2 className="watch-stage-title">No source can play this right now</h2>
             <p className="watch-stage-text">
-              All sources are down or don&apos;t have this title. Try again in a few minutes, or pick a source from the menu above.
+              All sources are down or don&apos;t have this title. Try again in a few minutes, or pick a server from the menu above.
             </p>
             <div className="watch-stage-actions">
               <button className="watch-btn is-primary" onClick={retryProviders}>Try again</button>
@@ -1304,10 +1316,10 @@ function WatchContent() {
         )}
       </AnimatePresence>
 
-      {/* ─── Episode Sidebar ─── */}
+      {/* ─── Episode strip ─── */}
       <AnimatePresence>
         {isSidebarOpen && mediaType === 'tv' && (
-          <EpisodeSidebar
+          <EpisodeStrip
             seasons={realSeasons}
             currentSeason={season}
             currentEpisode={episode}

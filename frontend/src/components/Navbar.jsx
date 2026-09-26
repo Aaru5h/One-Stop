@@ -7,14 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 
-const MenuIcon = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="w-[22px] h-[22px]">
-        <path fillRule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clipRule="evenodd" />
-    </svg>
-);
-
 const SearchIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-[18px] h-[18px]" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
     </svg>
 );
@@ -38,29 +32,38 @@ const Logo = () => (
     </svg>
 );
 
+const HomeIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-4 h-4" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1v-9.5z" />
+    </svg>
+);
+
+// `match` lets detail pages light up their section: /movie/603-the-matrix → Movies, /tv/1396-… → Shows.
 const NAV_LINKS = [
-    { href: '/', label: 'Home' },
-    { href: '/movies', label: 'Movies' },
-    { href: '/tv', label: 'TV Shows' },
-    { href: '/watchlist', label: 'Watchlist' },
+    { href: '/', label: 'Home', match: (p) => p === '/' },
+    { href: '/movies', label: 'Movies', match: (p) => p.startsWith('/movies') || p.startsWith('/movie/') },
+    { href: '/tv', label: 'Shows', match: (p) => p === '/tv' || p.startsWith('/tv/') },
+    { href: '/watchlist', label: 'My List', match: (p) => p.startsWith('/watchlist') },
 ];
 
 export default function Navbar() {
-    const [menuOpen, setMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
-    const menuRef = useRef(null);
     const userMenuRef = useRef(null);
     const router = useRouter();
-    const pathname = usePathname();
+    const pathname = usePathname() || '/';
     const { user, isAuthenticated, isLoading, logout } = useAuth();
 
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
             if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenuOpen(false);
         };
+        const handleKey = (e) => { if (e.key === 'Escape') setUserMenuOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKey);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKey);
+        };
     }, []);
 
     const handleLogout = async () => {
@@ -69,119 +72,119 @@ export default function Navbar() {
         router.push('/');
     };
 
-    // The player owns its own chrome (back button that fades on idle) — no site nav over the video.
+    // The player owns its own chrome, so no site nav over the video.
     if (pathname === '/watch') return null;
 
+    const searchActive = pathname.startsWith('/search');
+
     return (
-        <header className="fixed top-0 left-0 right-0 z-[110] hidden md:flex items-center h-[64px] px-4 md:px-6 transition-all duration-300 bg-gradient-to-b from-black/60 to-transparent backdrop-blur-[2px]">
-            {/* Left: hamburger + logo */}
-            <div className="flex items-center gap-3 flex-shrink-0" ref={menuRef}>
-                <div className="relative">
-                    <button
-                        type="button"
-                        onClick={() => setMenuOpen((v) => !v)}
-                        className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
-                        aria-label="Open menu"
-                    >
-                        <MenuIcon />
-                    </button>
+        <header className="fixed top-0 left-0 right-0 z-[110] hidden md:flex items-center justify-between h-[88px] px-6 lg:px-10 pointer-events-none bg-gradient-to-b from-black/70 via-black/25 to-transparent">
+            <Link href="/" className="pointer-events-auto flex items-center gap-2.5 select-none rounded-xl" aria-label="One Stop home">
+                <Logo />
+                <span className="text-[20px] font-bold text-white leading-none tracking-tight">
+                    one<span className="font-light opacity-70">Stop</span>
+                </span>
+            </Link>
 
-                    <AnimatePresence>
-                        {menuOpen && (
-                            <motion.div
-                                className="absolute left-0 top-full mt-2 w-56 rounded-2xl overflow-hidden bg-[#111] border border-white/10 shadow-2xl"
-                                initial={{ opacity: 0, y: -8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -8 }}
-                                transition={{ duration: 0.15 }}
-                            >
-                                <div className="py-1">
-                                    {NAV_LINKS.map((l) => (
-                                        <Link
-                                            key={l.href}
-                                            href={l.href}
-                                            onClick={() => setMenuOpen(false)}
-                                            className="block px-4 py-2.5 text-[14px] font-medium text-white/80 hover:text-white hover:bg-white/5 transition-colors"
-                                        >
-                                            {l.label}
-                                        </Link>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
+            {/* Glass pill: the blur keeps links legible over any hero backdrop */}
+            <nav
+                aria-label="Main"
+                className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-full bg-black/45 backdrop-blur-xl backdrop-saturate-150 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+            >
+                {NAV_LINKS.map((l) => {
+                    const active = l.match(pathname);
+                    return (
+                        <Link
+                            key={l.href}
+                            href={l.href}
+                            aria-current={active ? 'page' : undefined}
+                            className={clsx(
+                                'relative inline-flex items-center gap-2 h-10 px-4 rounded-full text-[14px] font-semibold transition-colors duration-200',
+                                active ? 'text-black' : 'text-white/75 hover:text-white hover:bg-white/10'
+                            )}
+                        >
+                            {active && (
+                                <motion.span
+                                    layoutId="nav-active-pill"
+                                    className="absolute inset-0 rounded-full bg-white"
+                                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                                />
+                            )}
+                            <span className="relative flex items-center gap-2">
+                                {active && l.href === '/' && <HomeIcon />}
+                                {l.label}
+                            </span>
+                        </Link>
+                    );
+                })}
 
-                <Link href="/" className="flex flex-row items-center gap-2.5 select-none">
-                    <Logo />
-                    <span className="text-[20px] font-bold text-white leading-none tracking-tight">
-                        one<span className="font-light opacity-70">Stop</span>
-                    </span>
-                </Link>
-            </div>
+                <span className="w-px h-5 mx-1.5 bg-white/15" aria-hidden="true" />
 
-            {/* Center: search pill */}
-            <div className="absolute left-1/2 -translate-x-1/2 w-[45%] max-w-[600px] min-w-[200px]">
                 <Link
                     href="/search"
-                    className="w-full flex items-center justify-between h-[42px] rounded-full px-5 gap-3 transition-all duration-200 border hover:bg-white/10"
-                    style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)' }}
+                    aria-label="Search"
+                    aria-current={searchActive ? 'page' : undefined}
+                    className={clsx(
+                        'inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-200',
+                        searchActive ? 'bg-white text-black' : 'text-white/75 hover:text-white hover:bg-white/10'
+                    )}
                 >
-                    <span className="text-[14px] font-semibold text-white/70 truncate tracking-wide">
-                        Search movies, shows…
-                    </span>
                     <SearchIcon />
                 </Link>
-            </div>
 
-            {/* Right: user */}
-            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
                 {isLoading ? (
-                    <div className="w-9 h-9 rounded-full bg-white/10 animate-pulse" />
+                    <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
                 ) : isAuthenticated ? (
                     <div className="relative" ref={userMenuRef}>
                         <button
                             type="button"
                             onClick={() => setUserMenuOpen((v) => !v)}
                             className={clsx(
-                                'flex items-center justify-center w-9 h-9 rounded-full transition-all duration-200 overflow-hidden',
+                                'flex items-center justify-center w-10 h-10 rounded-full transition-colors duration-200',
                                 userMenuOpen ? 'bg-white/15' : 'hover:bg-white/10'
                             )}
-                            aria-label="Profile"
+                            aria-label="Account"
+                            aria-haspopup="menu"
+                            aria-expanded={userMenuOpen}
                         >
                             {user?.name ? (
-                                <span className="text-white/90 font-semibold text-sm">{user.name.charAt(0).toUpperCase()}</span>
+                                <span className="w-7 h-7 rounded-full bg-white/15 flex items-center justify-center text-white font-bold text-[13px]">
+                                    {user.name.charAt(0).toUpperCase()}
+                                </span>
                             ) : (
-                                <span className="text-white/70"><UserIcon /></span>
+                                <span className="text-white/75"><UserIcon /></span>
                             )}
                         </button>
 
                         <AnimatePresence>
                             {userMenuOpen && (
                                 <motion.div
-                                    className="absolute right-0 mt-2 w-56 rounded-2xl overflow-hidden bg-[#111] border border-white/10 shadow-2xl"
-                                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                                    role="menu"
+                                    className="absolute right-0 top-full mt-3 w-60 rounded-2xl overflow-hidden bg-[#121212]/90 backdrop-blur-xl border border-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.6)] origin-top-right"
+                                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                                    transition={{ duration: 0.15 }}
+                                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                                    transition={{ duration: 0.15, ease: 'easeOut' }}
                                 >
                                     <div className="px-4 py-3 border-b border-white/10">
-                                        <p className="text-white font-medium truncate">{user?.name || 'User'}</p>
-                                        <p className="text-white/50 text-sm truncate">{user?.email}</p>
+                                        <p className="text-white font-semibold truncate">{user?.name || 'User'}</p>
+                                        <p className="text-white/60 text-sm truncate">{user?.email}</p>
                                     </div>
-                                    <div className="py-1">
+                                    <div className="p-1.5">
                                         <Link
                                             href="/watchlist"
-                                            className="block px-4 py-2.5 text-[14px] text-white/80 hover:text-white hover:bg-white/5 transition-colors"
+                                            role="menuitem"
+                                            className="block px-3 py-2.5 rounded-xl text-[14px] text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                                             onClick={() => setUserMenuOpen(false)}
                                         >
-                                            My Watchlist
+                                            My List
                                         </Link>
                                         <button
+                                            role="menuitem"
                                             onClick={handleLogout}
-                                            className="w-full flex items-center gap-2 px-4 py-2.5 text-[14px] text-red-400 hover:text-red-300 hover:bg-white/5 transition-colors"
+                                            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[14px] text-red-400 hover:text-red-300 hover:bg-white/10 transition-colors"
                                         >
-                                            <LogoutIcon /> Sign Out
+                                            <LogoutIcon /> Sign out
                                         </button>
                                     </div>
                                 </motion.div>
@@ -191,12 +194,12 @@ export default function Navbar() {
                 ) : (
                     <Link
                         href="/login"
-                        className="px-4 py-2 rounded-full text-[13px] font-semibold text-black bg-white hover:bg-white/90 transition-all"
+                        className="ml-0.5 inline-flex items-center h-10 px-4 rounded-full text-[14px] font-semibold text-white border border-white/25 hover:bg-white/10 transition-colors"
                     >
-                        Sign In
+                        Sign in
                     </Link>
                 )}
-            </div>
+            </nav>
         </header>
     );
 }

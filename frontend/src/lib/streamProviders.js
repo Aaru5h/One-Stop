@@ -12,6 +12,16 @@ export const STREAM_PROVIDERS = [
     },
   },
   {
+    // The player 2Embed wraps, embedded directly: same stream, minus 2Embed's server-menu and share overlays.
+    id: 'vidsrc',
+    name: 'VidSrc',
+    origin: 'https://vidsrc.buzz/',
+    getUrl: (type, id, s, e) =>
+      type === 'tv'
+        ? `https://vidsrc.buzz/embed/tv/${id}/${s}/${e}`
+        : `https://vidsrc.buzz/embed/movie/${id}`,
+  },
+  {
     id: 'superembed',
     name: 'SuperEmbed',
     origin: 'https://multiembed.mov/',
