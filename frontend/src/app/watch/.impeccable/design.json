@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-27T18:42:33.465483+00:00",
+  "title": "Design System: One Stop Watch Player",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "glass-panel",
+        "value": "0 24px 60px rgba(0, 0, 0, 0.6)",
+        "purpose": "Episode and menu separation from video."
+      }
+    ],
+    "motion": [
+      {
+        "name": "watch-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Existing toggle movement."
+      },
+      {
+        "name": "chrome",
+        "value": "opacity 180ms ease",
+        "purpose": "Direct-player idle chrome; removed for reduced motion."
+      },
+      {
+        "name": "episode-panel",
+        "value": "180ms; opacity 0 \u2192 1; translateY 16px \u2192 0",
+        "purpose": "Episode panel entrance; translation removed for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "768px"
+      },
+      {
+        "name": "narrow",
+        "value": "480px"
+      },
+      {
+        "name": "short-height",
+        "value": "500px (max-height)"
+      }
+    ],
+    "backdropFilter": "blur(28px) saturate(1.8)",
+    "focusRing": "2px solid #fff; 2px offset (4px on native range inputs)",
+    "colorMeta": {
+      "stage": {
+        "role": "neutral",
+        "displayName": "Stage",
+        "canonical": "#000",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Control",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Text Primary",
+        "canonical": "rgba(255, 255, 255, 0.95)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Text Secondary",
+        "canonical": "rgba(255, 255, 255, 0.62)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Text Tertiary",
+        "canonical": "rgba(255, 255, 255, 0.58)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "selected-server": {
+        "role": "primary",
+        "displayName": "Selected Server",
+        "canonical": "#46d369",
+        "tonalRamp": [
+          "oklch(15% 0.18 149)",
+          "oklch(26% 0.18 149)",
+          "oklch(38% 0.18 149)",
+          "oklch(49% 0.18 149)",
+          "oklch(61% 0.18 149)",
+          "oklch(72% 0.18 149)",
+          "oklch(84% 0.18 149)",
+          "oklch(95% 0.18 149)"
+        ]
+      },
+      "glass": {
+        "role": "neutral",
+        "displayName": "Glass",
+        "canonical": "rgba(18, 18, 18, 0.72)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "rgba(255, 255, 255, 0.08)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "surface-hover": {
+        "role": "neutral",
+        "displayName": "Surface Hover",
+        "canonical": "rgba(255, 255, 255, 0.14)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "canonical": "rgba(255, 255, 255, 0.12)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      }
+    },
+    "tonalRampNote": "Generated preview ramps only; not additional application color tokens. Translucent whites use neutral preview ramps."
+  },
+  "components": [
+    {
+      "name": "Playback control",
+      "kind": "button",
+      "refersTo": "control-button",
+      "description": "Direct-player icon control.",
+      "html": "<button class=\"ds-control\" aria-label=\"Play\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"m8 5 11 7-11 7Z\"/></svg></button>",
+      "css": ".ds-control{width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:var(--watch-text-primary,rgba(255,255,255,.95));cursor:pointer;transition:background-color .15s ease,transform .15s ease}.ds-control svg{width:25px;height:25px}.ds-control:hover{background:var(--watch-surface-3,rgba(255,255,255,.14))}.ds-control:active{transform:scale(.94)}.ds-control:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    },
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "primary-button",
+      "description": "Retry or play action.",
+      "html": "<button class=\"ds-primary\">Try again</button>",
+      "css": ".ds-primary{height:44px;padding:0 1.25rem;border:0;border-radius:999px;background:#fff;color:#000;font:600 .875rem var(--font-sans-nunito,system-ui),sans-serif;cursor:pointer}.ds-primary:hover{opacity:.85}.ds-primary:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    },
+    {
+      "name": "Selected server",
+      "kind": "nav",
+      "refersTo": "server-row",
+      "description": "Current server with green check.",
+      "html": "<button class=\"ds-server\" aria-current=\"true\">Server 1<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"m5 12 4 4L19 6\"/></svg></button>",
+      "css": ".ds-server{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:42px;padding:.5rem .625rem;border:0;border-radius:10px;background:var(--watch-surface-2,rgba(255,255,255,.08));color:#fff;font:600 .9rem var(--font-sans-nunito,system-ui),sans-serif;cursor:pointer}.ds-server svg{width:20px;height:20px;color:var(--watch-green,#46d369)}.ds-server:hover{background:var(--watch-surface-3,rgba(255,255,255,.14))}.ds-server:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    },
+    {
+      "name": "Episode card",
+      "kind": "card",
+      "refersTo": "episode-card",
+      "description": "Episode card with thumbnail fallback and now-playing tag.",
+      "html": "<article class=\"ds-card\"><button class=\"ds-episode\" disabled><div class=\"ds-thumb\">1<span>S1E1 \u00b7 Now Playing</span></div><h3>Episode 1</h3></button><p>Episode description</p></article>",
+      "css": ".ds-card{width:256px;min-height:260px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.07);color:#fff;font-family:var(--font-sans-nunito,system-ui),sans-serif;box-shadow:inset 0 0 0 2px rgba(255,255,255,.24)}.ds-episode{display:block;width:100%;border:0;padding:0;background:transparent;color:inherit;text-align:left}.ds-thumb{position:relative;display:grid;place-items:center;height:144px;background:rgba(255,255,255,.04);font-size:1.5rem}.ds-thumb span{position:absolute;top:.5rem;left:.5rem;background:rgba(0,0,0,.6);border-radius:6px;padding:.125rem .5rem;font-size:.72rem}.ds-card h3,.ds-card p{padding:0 .75rem;font-size:.875rem}.ds-card p{color:var(--watch-text-secondary,rgba(255,255,255,.62))}.ds-episode:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    },
+    {
+      "name": "Seek input",
+      "kind": "input",
+      "description": "Keyboard-accessible time range.",
+      "html": "<input class=\"ds-seek\" aria-label=\"Seek\" type=\"range\" min=\"0\" max=\"100\" value=\"35\"/>",
+      "css": ".ds-seek{width:100%;height:24px;accent-color:#fff;cursor:pointer;background:transparent}.ds-seek:hover{opacity:.9}.ds-seek:focus-visible{outline:2px solid #fff;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Cinema Stage",
+    "overview": "Experience mode, scoped to the watch/player surface. Cinejoy is the explicit visual reference: true black, compact Nunito Sans type, white controls, and glass menus keep the video dominant. Direct movie and TV streams share one control vocabulary across servers; TV adds compact episode browsing.",
+    "keyCharacteristics": [
+      "Video first; controls along the bottom of the direct player.",
+      "Neutral controls with green selected-server indicators.",
+      "Episode browsing stays separate from playback selection."
+    ],
+    "rules": [],
+    "dos": [
+      "Do preserve the same direct-player controls across returned stream servers.",
+      "Do keep season browsing independent of the playing episode.",
+      "Do retain keyboard focus indicators and reduced-motion handling."
+    ],
+    "donts": [
+      "Don't add episode actions to movies.",
+      "Don't describe iframe internals as themed or controlled by this surface.",
+      "Don't treat the implemented direct player as an already connected stream service."
+    ]
+  }
+}

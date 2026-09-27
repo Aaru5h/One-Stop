@@ -16,6 +16,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.26",
     "fuse.js": "^7.4.1",
+    "hls.js": "^1.7.3",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.3",
     "next": "16.1.1",

@@ -902,3 +902,129 @@
   .watch-spinner { animation-duration: 2.4s; }
   .watch-status-dot.is-pending { animation: none; }
 }
+
+/* Shared episode browser; browsing seasons does not change playback. */
+.episode-strip { max-height: calc(100dvh - var(--watch-header-height) - 7rem); }
+.strip-top { min-height: 62px; padding: .5rem 1.25rem; border-bottom: 1px solid var(--watch-line); flex: none; }
+.strip-panel-title { margin: 0; font-size: 1rem; font-weight: 700; }
+.strip-close { margin-left: auto; flex: none; }
+.strip-close svg { width: 20px; height: 20px; }
+.strip-season-button { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: 0; border: 0; background: transparent; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.strip-season-button svg { width: 16px; height: 16px; color: var(--watch-text-secondary); }
+.strip-body { min-height: 0; overflow: auto; }
+.strip-rail { position: relative; padding: 1.25rem 4rem 1rem; scroll-padding-inline: 4rem; align-items: flex-start; }
+.strip-card { cursor: auto; min-height: 260px; }
+.strip-card.is-active::after { box-shadow: inset 0 0 0 2px rgba(255,255,255,.24); }
+.strip-episode-button { display: block; width: 100%; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.strip-episode-button:disabled { cursor: default; }
+.strip-episode-button .strip-title { padding: .75rem .75rem 0; }
+.strip-info { padding-top: .5rem; }
+.strip-overview.is-expanded { display: block; }
+.strip-more { align-self: flex-start; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--watch-text-secondary); font: inherit; font-size: .75rem; cursor: pointer; }
+.strip-more:hover { color: #fff; }
+.strip-nav { top: 110px; opacity: 1; width: 44px; height: 44px; border: 0; background: transparent; }
+.strip-nav svg { width: 26px; height: 26px; }
+.strip-nav:disabled { opacity: .25; cursor: default; }
+.strip-empty { flex-direction: column; gap: 1rem; }
+.episode-strip.is-season-picker { left: auto; right: 2rem; width: min(380px, calc(100vw - 2rem)); height: min(460px, calc(100dvh - 12rem)); }
+.strip-seasons { overflow-y: auto; padding: .75rem; }
+.strip-season-option { display: flex; align-items: center; gap: .75rem; width: 100%; min-height: 50px; padding: .5rem .75rem; border: 0; border-radius: 10px; background: transparent; color: #fff; text-align: left; font: inherit; font-size: .875rem; cursor: pointer; }
+.strip-season-option:hover, .strip-season-option.is-selected { background: var(--watch-surface-2); }
+.strip-season-number { border-radius: 6px; padding: .25rem .5rem; background: var(--watch-surface-2); font-size: .75rem; font-weight: 700; }
+.strip-season-playing { margin-left: auto; color: var(--watch-text-secondary); font-size: .7rem; }
+
+/* Direct-stream player: every server uses this video element and control UI. */
+.native-player { --native-controls-height: 96px; outline: none; }
+.native-player.is-idle { cursor: none; }
+.native-video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
+.native-shade { position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, #000c, #0006 65%, #0008); pointer-events: none; }
+.native-paused-copy, .native-loading { z-index: 2; }
+.native-header { position: absolute; top: 0; left: 0; right: 0; z-index: 32; display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 1rem; padding: max(1.25rem, env(safe-area-inset-top)) max(2rem, env(safe-area-inset-right)) 2rem max(2rem, env(safe-area-inset-left)); background: linear-gradient(#0009, transparent); }
+.native-header .watch-heading { justify-self: center; max-width: min(70vw, 800px); }
+.native-chrome { transition: opacity 180ms ease; }
+.native-player.is-idle .native-chrome { opacity: 0; pointer-events: none; }
+.native-player.is-idle .native-chrome:focus-within { opacity: 1; pointer-events: auto; }
+.native-controls { position: absolute; z-index: 32; bottom: 0; left: 0; right: 0; padding: 2rem max(2rem, env(safe-area-inset-right)) max(.75rem, env(safe-area-inset-bottom)) max(2rem, env(safe-area-inset-left)); background: linear-gradient(transparent, #000c); }
+.native-control-row, .native-controls-left, .native-controls-right { display: flex; align-items: center; gap: .5rem; }
+.native-control-row { justify-content: space-between; gap: 1rem; }
+.native-controls .watch-icon-btn { border-radius: 10px; }
+.native-controls .watch-icon-btn svg { width: 25px; height: 25px; }
+.native-controls button:disabled { opacity: .35; cursor: default; }
+.native-time { white-space: nowrap; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.native-time span { color: #ffffffb3; }
+.native-volume { display: flex; align-items: center; }
+.native-volume input { width: 0; opacity: 0; accent-color: #fff; transition: opacity 150ms ease; }
+.native-volume:hover input, .native-volume:focus-within input { width: 72px; opacity: 1; margin-right: .5rem; }
+.native-seek { display: block; appearance: none; width: 100%; height: 24px; padding: 0; margin: 0 0 .25rem; background: transparent; cursor: pointer; accent-color: #fff; }
+.native-seek::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(to right, #fff var(--played), #ffffff4d var(--played)); border-radius: 4px; }
+.native-seek::-webkit-slider-thumb { appearance: none; height: 12px; width: 12px; margin-top: -4px; background: #fff; border-radius: 50%; }
+.native-seek::-moz-range-track { height: 4px; background: #ffffff4d; border-radius: 4px; }
+.native-seek::-moz-range-progress { height: 4px; background: #fff; }
+.native-seek::-moz-range-thumb { height: 12px; width: 12px; border: 0; background: #fff; border-radius: 50%; }
+.native-player input:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+.native-player .episode-strip { bottom: calc(var(--native-controls-height) + env(safe-area-inset-bottom)); }
+.native-menu.watch-menu { position: absolute; top: auto; right: max(2rem, env(safe-area-inset-right)); bottom: calc(var(--native-controls-height) + env(safe-area-inset-bottom)); z-index: 35; width: 340px; max-width: calc(100vw - 2rem); max-height: calc(100dvh - 12rem); overflow-y: auto; }
+.native-menu svg { width: 20px; height: 20px; flex: none; }
+.native-settings { display: flex; flex-direction: column; gap: 1rem; padding: .75rem; }
+.native-settings label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: .875rem; }
+.native-settings select { min-height: 36px; max-width: 50%; border: 1px solid var(--watch-line-strong); border-radius: 8px; background: #282828; color: #fff; padding: .25rem .5rem; font: inherit; }
+.native-settings input { accent-color: var(--watch-green); width: 18px; height: 18px; }
+.native-loading, .native-error { position: absolute; inset: 25% 1rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; text-align: center; }
+.native-loading { pointer-events: none; font-size: .875rem; }
+.native-error { z-index: 10; background: #000b; padding: 1rem; border-radius: 16px; }
+.native-error h2, .native-error p { margin: 0; }
+.native-paused-copy { position: absolute; pointer-events: none; top: 50%; left: max(3.5rem, env(safe-area-inset-left)); transform: translateY(-50%); max-width: min(560px, 50vw); text-shadow: 0 2px 18px #000; }
+.native-paused-copy h2 { margin: 0 0 1rem; font-size: clamp(1.5rem, 3vw, 3rem); line-height: 1.1; text-wrap: balance; }
+.native-paused-copy p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font-size: .875rem; line-height: 1.6; color: #ffffffe0; }
+.native-paused-copy .native-paused-subtitle { margin-bottom: .75rem; font-weight: 700; }
+.native-notice { position: absolute; z-index: 40; top: 90px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 1rem; max-width: calc(100vw - 2rem); padding: .75rem 1rem; background: #242424; border-radius: 12px; font-size: .875rem; }
+.native-notice button { border: 0; background: none; color: #fff; cursor: pointer; }
+.native-notice svg { width: 20px; height: 20px; }
+.native-up-next { position: absolute; z-index: 34; right: 2rem; bottom: 7rem; padding: 1.5rem; max-width: min(380px, calc(100vw - 2rem)); background: var(--watch-glass); backdrop-filter: var(--watch-glass-blur); border-radius: 16px; }
+.native-up-next p { margin: 0 0 .5rem; font-size: .875rem; }
+.native-up-next h2 { margin: 0 0 1rem; font-size: 1.25rem; }
+.native-up-next > div { display: flex; gap: .5rem; }
+@media (max-width: 768px) {
+  .strip-rail { padding: .75rem 1rem 1rem; scroll-padding-inline: 1rem; }
+  .strip-card { min-height: 235px; }
+  .strip-top { min-height: 54px; padding: .25rem .75rem; }
+  .episode-strip.is-season-picker { right: .5rem; width: min(380px, calc(100vw - 1rem)); }
+  .native-header { padding: max(.75rem, env(safe-area-inset-top)) .75rem 1.5rem; gap: .5rem; }
+  .native-header .watch-heading { max-width: 100%; }
+  .native-header .watch-heading-title { font-size: .875rem; }
+  .native-controls { padding: 1.5rem .75rem max(.5rem, env(safe-area-inset-bottom)); }
+  .native-controls-left, .native-controls-right { gap: 0; }
+  .native-control-row { gap: .25rem; }
+  .native-volume input { display: none; }
+  .native-time { font-size: .75rem; }
+  .native-time span { display: none; }
+  .native-controls .watch-icon-btn { width: 36px; height: 44px; }
+  .native-controls .watch-icon-btn svg { width: 22px; height: 22px; }
+  .native-controls [aria-label="Picture in picture"], .native-controls [aria-label^="Next episode"] { display: none; }
+  .native-menu.watch-menu { right: .75rem; }
+  .native-paused-copy { left: 1.5rem; max-width: min(480px, calc(100vw - 3rem)); }
+  .native-paused-copy p { -webkit-line-clamp: 3; }
+}
+@media (max-width: 480px) {
+  .native-player { --native-controls-height: 132px; }
+  .native-control-row { flex-wrap: wrap; }
+  .native-controls-left, .native-controls-right { justify-content: space-between; width: 100%; }
+  .native-controls .watch-icon-btn { width: 44px; }
+  .native-time { margin-left: auto; padding-right: .5rem; }
+  .native-time span { display: inline; }
+  .native-player .episode-strip { max-height: calc(100dvh - 14rem); }
+  .native-menu.watch-menu { max-height: calc(100dvh - 14rem); }
+  .native-up-next { right: 1rem; bottom: 9rem; }
+}
+@media (max-height: 500px) {
+  .episode-strip, .native-player .episode-strip { max-height: calc(100dvh - 8rem); }
+  .strip-thumb { height: 85px; }
+  .strip-card { min-height: 0; }
+  .strip-overview, .strip-more, .strip-runtime { display: none; }
+  .native-menu.watch-menu { max-height: calc(100dvh - 7rem); }
+  .native-paused-copy p { -webkit-line-clamp: 2; }
+  .native-paused-copy h2 { font-size: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .native-chrome, .native-volume input { transition: none; }
+}
